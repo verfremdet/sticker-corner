@@ -6,6 +6,7 @@ import { classNameFactory } from "@utils/css";
 import { Channel } from "@vencord/discord-types";
 import { useLayoutEffect, useMemo, useRef, useState } from "@webpack/common";
 
+import { CategoryChip, categoriesOf, chipsFor } from "./categories";
 import { t } from "./i18n";
 import { sendSticker, smallUrl, Sticker, toggleFavorite, useStickers } from "./store";
 import { dismissWhatsNew, itemsOf, restartDiscord, runUpdate, useUpdate, useWhatsNew } from "./updater";
@@ -126,16 +127,68 @@ function UpdateBanner() {
     );
 }
 
+function CategoryChips({ chips, active, onPick }: { chips: CategoryChip[]; active: string | null; onPick(id: string | null): void; }) {
+    if (!chips.length) return null;
+    return (
+        <div className={cl("chips")} role="toolbar">
+            <button className={cl("chip", !active && "chip-active")} onClick={() => onPick(null)}>{t("allCategories")}</button>
+            {chips.map(c => (
+                <button
+                    key={c.id}
+                    className={cl("chip", active === c.id && "chip-active")}
+                    onClick={() => onPick(active === c.id ? null : c.id)}
+                >
+                    {c.label}<span className={cl("chip-count")}>{c.count}</span>
+                </button>
+            ))}
+        </div>
+    );
+}
+
+/** Arrow keys: move to the nearest tile in that direction (works across sections and column counts) */
+function moveFocus(from: HTMLElement, key: string, root: HTMLElement): HTMLElement | null {
+    const tiles = [...root.querySelectorAll<HTMLElement>(".vc-sc-tile")];
+    const a = from.getBoundingClientRect();
+    const ax = a.left + a.width / 2, ay = a.top + a.height / 2;
+    let best: HTMLElement | null = null, bestScore = Infinity;
+    for (const el of tiles) {
+        if (el === from) continue;
+        const b = el.getBoundingClientRect();
+        const dx = b.left + b.width / 2 - ax, dy = b.top + b.height / 2 - ay;
+        const ok = key === "ArrowRight" ? dx > 4 && Math.abs(dy) < a.height / 2
+            : key === "ArrowLeft" ? dx < -4 && Math.abs(dy) < a.height / 2
+                : key === "ArrowDown" ? dy > 4 : dy < -4;
+        if (!ok) continue;
+        // vertical: prefer the next row, then the closest column
+        const score = key === "ArrowDown" || key === "ArrowUp" ? Math.abs(dy) * 1000 + Math.abs(dx) : Math.abs(dx);
+        if (score < bestScore) { bestScore = score; best = el; }
+    }
+    // Right at the end of a row → first tile of the next row (and the reverse for left)
+    if (!best && (key === "ArrowRight" || key === "ArrowLeft")) {
+        const i = tiles.indexOf(from);
+        best = tiles[key === "ArrowRight" ? i + 1 : i - 1] ?? null;
+    }
+    return best;
+}
+
 export function StickerCornerPanel({ channel, close }: Props) {
-    const { stickers, recent, favorites, isFavorite, loaded, failed } = useStickers();
+    const { stickers, popular, recent, favorites, isFavorite, loaded, failed } = useStickers();
     const [query, setQuery] = useState("");
+    const [category, setCategory] = useState<string | null>(null);
     const [hovered, setHovered] = useState<Sticker | null>(null);
+    const searchRef = useRef<HTMLInputElement>(null);
 
     const q = query.trim().toLowerCase();
-    const filtered = useMemo(
-        () => q ? stickers.filter(s => s.name.toLowerCase().includes(q) || s.author.toLowerCase().includes(q)) : stickers,
-        [stickers, q]
-    );
+    const chips = useMemo(() => chipsFor(stickers), [stickers]);
+    const activeCategory = chips.some(c => c.id === category) ? category : null;
+    const filtered = useMemo(() => {
+        let list = stickers;
+        if (activeCategory) list = list.filter(s => categoriesOf(s).includes(activeCategory));
+        if (q) list = list.filter(s => s.name.toLowerCase().includes(q) || s.author.toLowerCase().includes(q));
+        return list;
+    }, [stickers, q, activeCategory]);
+    const narrowed = !!q || !!activeCategory;
+    const categoryLabel = chips.find(c => c.id === activeCategory)?.label;
 
     const onSend = (s: Sticker, e: React.MouseEvent) => {
         sendSticker(s, channel.id);
@@ -154,8 +207,37 @@ export function StickerCornerPanel({ channel, close }: Props) {
     }, [loaded, favorites.length, recent.length]);
     useLayoutEffect(() => {
         if (scrollerRef.current) scrollerRef.current.scrollTop = 0;
-    }, [q]);
+    }, [q, activeCategory]);
     const markScrolled = () => { userScrolled.current = true; };
+
+    // Keyboard: ↓ from the search goes into the grid, arrows move, Enter sends, ↑ in the top row goes back to the search
+    const onKeyDown = (e: React.KeyboardEvent) => {
+        if (!e.key.startsWith("Arrow")) return;
+        const root = scrollerRef.current;
+        const target = e.target as HTMLElement;
+        if (!root) return;
+        if (target === searchRef.current) {
+            if (e.key !== "ArrowDown") return;
+            const first = root.querySelector<HTMLElement>(".vc-sc-tile");
+            if (!first) return;
+            e.preventDefault();
+            e.stopPropagation();
+            first.focus();
+            first.scrollIntoView({ block: "nearest" });
+            return;
+        }
+        if (!target.classList.contains("vc-sc-tile")) return;
+        e.preventDefault();
+        e.stopPropagation();
+        userScrolled.current = true;
+        const next = moveFocus(target, e.key, root);
+        if (next) {
+            next.focus();
+            next.scrollIntoView({ block: "nearest" });
+        } else if (e.key === "ArrowUp") {
+            searchRef.current?.focus();
+        }
+    };
 
     let body: React.ReactNode;
     if (!loaded) {
@@ -165,24 +247,31 @@ export function StickerCornerPanel({ channel, close }: Props) {
     } else if (!stickers.length) {
         body = <div className={cl("empty")}>{t("empty")}</div>;
     } else if (!filtered.length) {
-        body = <div className={cl("empty")}>{t("noResults", { q: query })}</div>;
+        body = <div className={cl("empty")}>{t("noResults", { q: query || categoryLabel || "" })}</div>;
     } else {
+        const title = q
+            ? t("results", { n: filtered.length })
+            : activeCategory
+                ? `${categoryLabel} (${filtered.length})`
+                : t("all", { n: stickers.length });
         body = (
             <>
-                {!q && <Section title={t("favorites", { n: favorites.length })} stickers={favorites} {...handlers} />}
-                {!q && <Section title={t("recent")} stickers={recent} {...handlers} />}
-                <Section title={q ? t("results", { n: filtered.length }) : t("all", { n: stickers.length })} stickers={filtered} {...handlers} />
+                {!narrowed && <Section title={t("favorites", { n: favorites.length })} stickers={favorites} {...handlers} />}
+                {!narrowed && <Section title={t("recent")} stickers={recent} {...handlers} />}
+                {!narrowed && <Section title={t("popular")} stickers={popular} {...handlers} />}
+                <Section title={title} stickers={filtered} {...handlers} />
             </>
         );
     }
 
     return (
-        <div id="vc-stickercorner-panel" role="tabpanel" aria-labelledby="vc-stickercorner-tab" className={cl("panel")}>
+        <div id="vc-stickercorner-panel" role="tabpanel" aria-labelledby="vc-stickercorner-tab" className={cl("panel")} onKeyDown={onKeyDown}>
             <UpdateBanner />
             <div className={cl("header")}>
                 <label className={cl("search")}>
                     <SearchIcon />
                     <input
+                        ref={searchRef}
                         autoFocus
                         value={query}
                         onChange={e => setQuery(e.currentTarget.value)}
@@ -191,6 +280,7 @@ export function StickerCornerPanel({ channel, close }: Props) {
                     />
                 </label>
             </div>
+            <CategoryChips chips={chips} active={activeCategory} onPick={setCategory} />
             <div
                 ref={scrollerRef}
                 className={cl("scroller")}

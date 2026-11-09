@@ -351,3 +351,144 @@
 *:hover > .vc-sc-chatbutton {
     transform: scale(1.14) rotate(-6deg);
 }
+
+/* Kategorien (automatisch aus dem Namen) */
+.vc-sc-chips {
+    flex: none;
+    display: flex;
+    gap: 6px;
+    padding: 2px 16px 10px;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.vc-sc-chips::-webkit-scrollbar {
+    display: none;
+}
+
+.vc-sc-chip {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 28px;
+    padding: 0 12px;
+    border: 1px solid var(--background-mod-subtle, rgb(255 255 255 / 10%));
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text-default, #dbdee1);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.vc-sc-chip:hover {
+    transform: scale(1.08);
+    background: var(--background-mod-subtle, rgb(255 255 255 / 6%));
+}
+
+.vc-sc-chip:active {
+    transform: scale(0.92);
+}
+
+.vc-sc-chip-active,
+.vc-sc-chip-active:hover {
+    background: var(--vc-sc-accent);
+    border-color: var(--vc-sc-accent);
+    color: #fff;
+}
+
+.vc-sc-chip-count {
+    font-size: 11px;
+    font-weight: 700;
+    opacity: 0.6;
+}
+
+/* „Zu Sticker Corner hinzufügen“ */
+.vc-sc-add-title {
+    font-family: var(--vc-sc-font);
+    font-weight: 800;
+    font-size: 16px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--vc-sc-brand);
+}
+
+.vc-sc-add-body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 8px 0 16px;
+}
+
+.vc-sc-add-preview {
+    max-width: 224px;
+    max-height: 224px;
+    border-radius: 8px;
+    object-fit: contain;
+}
+
+.vc-sc-add-label {
+    align-self: stretch;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.vc-sc-add-input {
+    height: 40px;
+    padding: 0 12px;
+    border-radius: 8px;
+    border: 1px solid var(--input-border, transparent);
+    background: var(--input-background, var(--background-base-lowest, #1e1f22));
+    color: var(--text-default, #dbdee1);
+    font-family: inherit;
+    font-size: 16px;
+    font-weight: 400;
+    text-transform: none;
+    outline: none;
+}
+
+.vc-sc-add-input:focus {
+    border-color: var(--text-link, #00a8fc);
+    box-shadow: 0 0 0 1px var(--text-link, #00a8fc);
+}
+
+.vc-sc-add-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    width: 100%;
+}
+
+.vc-sc-add-actions .vc-sc-update-btn {
+    padding: 8px 18px;
+    font-size: 14px;
+}
+
+.vc-sc-add-actions .vc-sc-update-btn:disabled {
+    opacity: 0.6;
+    cursor: default;
+    transform: none;
+}
+
+.vc-sc-add-cancel {
+    padding: 8px 14px;
+    border: none;
+    background: none;
+    color: var(--text-default, #dbdee1);
+    font-family: inherit;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.vc-sc-add-cancel:hover {
+    text-decoration: underline;
+}

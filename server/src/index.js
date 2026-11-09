@@ -18,6 +18,25 @@ if (!DISCORD_TOKEN || !CHANNEL_ID) {
 
 const store = new Store(DATA_DIR);
 await store.load();
+store.channelId = CHANNEL_ID;
+
+// „Beliebt“-Zähler: je IP und Sticker höchstens 1× pro 10 min, je IP höchstens 120 pro Stunde
+const USE_SAME_MS = 10 * 60_000;
+const USE_PER_HOUR = 120;
+const useLog = new Map(); // ip → { hour, count, last: Map<id, time> }
+function allowUse(ip, id) {
+    const now = Date.now();
+    let e = useLog.get(ip);
+    if (!e || now - e.hour > 3_600_000) useLog.set(ip, e = { hour: now, count: 0, last: new Map() });
+    if (e.count >= USE_PER_HOUR || now - (e.last.get(id) ?? 0) < USE_SAME_MS) return false;
+    e.count++;
+    e.last.set(id, now);
+    return true;
+}
+setInterval(() => {
+    const now = Date.now();
+    for (const [ip, e] of useLog) if (now - e.hour > 3_600_000) useLog.delete(ip);
+}, 600_000).unref();
 store.backfillSmall().catch(e => console.error("Nachziehen:", e.message));
 
 // ── HTTP ────────────────────────────────────────────────────────────────
@@ -32,6 +51,15 @@ const server = http.createServer(async (req, res) => {
         if (req.headers["if-none-match"] === etag) return void res.writeHead(304).end();
         res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
         return void res.end(JSON.stringify(store.list()));
+    }
+
+    const used = /^\/api\/used\/(\d{5,25})$/.exec(url.pathname);
+    if (used) {
+        if (req.method !== "POST") return void res.writeHead(405).end();
+        const xff = String(req.headers["x-forwarded-for"] ?? "").split(",")[0].trim();
+        const ip = String(req.headers["cf-connecting-ip"] ?? (xff || req.socket.remoteAddress) ?? "");
+        const ok = allowUse(ip, used[1]) && store.use(used[1]);
+        return void res.writeHead(ok ? 204 : 202).end();
     }
 
     // <id>.<ext> = Original, <id>.s.<ext> = kleine Sende-Version

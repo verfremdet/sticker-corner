@@ -14,6 +14,7 @@ import { ExpressionPickerStore } from "@webpack/common";
 import type { ComponentType, ReactNode } from "react";
 
 import { StickerCornerChatButton, StickerCornerIcon, VIEW } from "./chatButton";
+import { imageContextMenuPatch, messageContextMenuPatch } from "./contextMenu";
 import { settings } from "./settings";
 import { cl, StickerCornerPanel } from "./StickerCorner";
 import { start, stop } from "./store";
@@ -35,6 +36,11 @@ export default definePlugin({
     chatBarButton: {
         icon: StickerCornerIcon,
         render: StickerCornerChatButton,
+    },
+
+    contextMenus: {
+        "message": messageContextMenuPatch,
+        "image-context": imageContextMenuPatch,
     },
 
     patches: [

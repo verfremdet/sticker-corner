@@ -1,6 +1,24 @@
 {
-    "version": "1.2.2",
+    "version": "1.3.0",
     "news": [
+        {
+            "version": "1.3.0",
+            "date": "2026-11-09",
+            "items": {
+                "en": [
+                    "Categories: Cats, Sea, Food … recognized automatically from the sticker name",
+                    "\"Popular\": the stickers everyone sends most",
+                    "Right-click any image → \"Add to Sticker Corner\" (if you can post in the sticker channel)",
+                    "Keyboard: ↓ from the search, arrows to move, Enter to send"
+                ],
+                "de": [
+                    "Kategorien: Katzen, Meer, Essen … automatisch am Sticker-Namen erkannt",
+                    "„Beliebt“: die Sticker, die alle am meisten senden",
+                    "Rechtsklick auf ein Bild → „Zu Sticker Corner hinzufügen“ (wenn du in den Sticker-Channel posten darfst)",
+                    "Tastatur: ↓ aus der Suche, Pfeiltasten zum Wählen, Enter sendet"
+                ]
+            }
+        },
         {
             "version": "1.2.2",
             "date": "2026-11-09",

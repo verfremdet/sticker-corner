@@ -35,6 +35,18 @@ const en = {
     notifyTitle: "Sticker Corner {v} is here",
     notifyBody: "New: {item} – update in the “Sticker Corner” tab.",
     notifyBodyPlain: "Update in the “Sticker Corner” tab.",
+    popular: "Popular",
+    allCategories: "All",
+    addToCorner: "Add to Sticker Corner",
+    addTitle: "Add to Sticker Corner",
+    addNameLabel: "Name (helps with search and categories)",
+    addNamePlaceholder: "e.g. sleepy cat",
+    addButton: "Add",
+    cancel: "Cancel",
+    adding: "Adding …",
+    added: "Added – everyone has it within 30 s",
+    addFailed: "Couldn't add the image",
+    tooBig: "Image is too big (max. 10 MB)",
 };
 
 const de: typeof en = {
@@ -67,6 +79,18 @@ const de: typeof en = {
     notifyTitle: "Sticker Corner {v} ist da",
     notifyBody: "Neu: {item} – Update im Reiter „Sticker Corner“.",
     notifyBodyPlain: "Update im Reiter „Sticker Corner“.",
+    popular: "Beliebt",
+    allCategories: "Alle",
+    addToCorner: "Zu Sticker Corner hinzufügen",
+    addTitle: "Zu Sticker Corner hinzufügen",
+    addNameLabel: "Name (hilft bei Suche und Kategorien)",
+    addNamePlaceholder: "z. B. müde Katze",
+    addButton: "Hinzufügen",
+    cancel: "Abbrechen",
+    adding: "Wird hinzugefügt …",
+    added: "Hinzugefügt – in 30 s bei allen",
+    addFailed: "Bild konnte nicht hinzugefügt werden",
+    tooBig: "Bild ist zu groß (max. 10 MB)",
 };
 
 export type Lang = "en" | "de";

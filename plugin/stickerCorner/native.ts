@@ -24,6 +24,22 @@ const VENCORD_DIR = join(__dirname, "..");
 const PLUGIN_DIR = join(VENCORD_DIR, "src", "userplugins", "stickerCorner");
 const REPO_DIR = join(VENCORD_DIR, "..", "sticker-corner");
 
+// „Zu Sticker Corner hinzufügen“: Bild aus Discord laden (nur Discord-/Tenor-Adressen, max. 10 MB)
+const MEDIA_HOSTS = /^(cdn\.discordapp\.com|media\.discordapp\.net|images-ext-\d+\.discordapp\.net|media\.tenor\.com)$/;
+const MEDIA_MAX = 10 * 1024 * 1024;
+
+export async function fetchMedia(_: IpcMainInvokeEvent, url: string): Promise<{ data?: Uint8Array; type?: string; error?: "host" | "size" | "http"; }> {
+    let u: URL;
+    try { u = new URL(url); } catch { return { error: "host" }; }
+    if (u.protocol !== "https:" || !MEDIA_HOSTS.test(u.hostname)) return { error: "host" };
+    const res = await fetch(u);
+    if (!res.ok) return { error: "http" };
+    if (Number(res.headers.get("content-length") ?? 0) > MEDIA_MAX) return { error: "size" };
+    const data = new Uint8Array(await res.arrayBuffer());
+    if (data.length > MEDIA_MAX) return { error: "size" };
+    return { data, type: (res.headers.get("content-type") ?? "").split(";")[0] };
+}
+
 const exists = (p: string) => stat(p).then(() => true, () => false);
 const git = (...args: string[]) => execFile("git", args, { cwd: REPO_DIR, windowsHide: true });
 

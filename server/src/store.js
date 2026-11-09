@@ -102,7 +102,7 @@ export class Store {
 
     list() {
         const stickers = [...this.stickers.values()].sort((a, b) => b.createdAt - a.createdAt);
-        return { version: this.version, stickers };
+        return { version: this.version, channelId: this.channelId, stickers };
     }
 
     has(id) {
@@ -274,6 +274,15 @@ export class Store {
         const name = latest?.text ?? s.baseName;
         if (s.name === name) return false;
         s.name = name;
+        return true;
+    }
+
+    /** Ein Plugin-Nutzer hat den Sticker gesendet → für „Beliebt“ mitzählen */
+    use(id) {
+        const s = this.stickers.get(id);
+        if (!s) return false;
+        s.uses = (s.uses ?? 0) + 1;
+        this.changed();
         return true;
     }
 

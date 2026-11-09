@@ -24,6 +24,11 @@ sticker channel ──(read-only bot)──► stickers.verfremdet.com ──►
   These addresses are fixed in [`native.ts`](plugin/stickerCorner/native.ts) and [`updater.ts`](plugin/stickerCorner/updater.ts).
 - **Sending:** only when you click a sticker. It uses the same upload path Discord uses when you attach an image yourself
   ([`store.ts`](plugin/stickerCorner/store.ts)).
+- **"Popular":** after you send a sticker, the plugin tells the server the sticker's number so it can count sends.
+  Nothing else is sent – no name, no account, no chat.
+- **"Add to Sticker Corner"** (right-click on an image): only visible if you can post in the sticker channel anyway.
+  It loads that one image from Discord's own servers and posts it into the sticker channel with the name you typed
+  ([`contextMenu.tsx`](plugin/stickerCorner/contextMenu.tsx)).
 - It does not read your token, password or messages, and sends no data about you anywhere.
 - **Updates:** the update button pulls this repository with git and rebuilds Vencord. Nothing is downloaded from anywhere else.
 

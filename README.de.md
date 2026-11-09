@@ -24,6 +24,11 @@ Sticker-Channel ──(Bot, nur Lesen)──► stickers.verfremdet.com ──�
   Die Adressen stehen fest in [`native.ts`](plugin/stickerCorner/native.ts) und [`updater.ts`](plugin/stickerCorner/updater.ts).
 - **Senden:** nur, wenn du einen Sticker anklickst. Dabei nutzt es denselben Upload-Weg wie Discord, wenn du selbst ein Bild anhängst
   ([`store.ts`](plugin/stickerCorner/store.ts)).
+- **„Beliebt“:** Nach dem Senden schickt das Plugin dem Server die Nummer des Stickers, damit er mitzählen kann.
+  Sonst nichts – kein Name, kein Konto, kein Chat.
+- **„Zu Sticker Corner hinzufügen“** (Rechtsklick auf ein Bild): nur sichtbar, wenn du sowieso in den Sticker-Channel posten darfst.
+  Es lädt dieses eine Bild von Discords eigenen Servern und postet es mit dem eingegebenen Namen in den Sticker-Channel
+  ([`contextMenu.tsx`](plugin/stickerCorner/contextMenu.tsx)).
 - Es liest weder deinen Token noch dein Passwort oder deine Nachrichten und schickt keine Daten über dich weg.
 - **Updates:** Der Update-Knopf holt dieses Repo per git und baut Vencord neu. Von anderswo wird nichts geladen.
 
