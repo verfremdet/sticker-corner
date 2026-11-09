@@ -132,4 +132,15 @@ process.on("SIGTERM", async () => {
     process.exit(0);
 });
 
-await client.login(DISCORD_TOKEN);
+// Login-Fehler (z. B. Intent aus, Discord down) beenden nicht den Prozess:
+// der Bild-Server liefert weiter die gespeicherten Sticker, Login wird wiederholt.
+async function connect() {
+    try {
+        await client.login(DISCORD_TOKEN);
+    } catch (e) {
+        console.error(`Login fehlgeschlagen: ${e.message} – neuer Versuch in 60 s`);
+        await client.destroy().catch(() => {});
+        setTimeout(connect, 60_000);
+    }
+}
+connect();
