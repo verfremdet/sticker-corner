@@ -1,6 +1,18 @@
 {
-    "version": "1.4.2",
+    "version": "1.4.3",
     "news": [
+        {
+            "version": "1.4.3",
+            "date": "2026-11-09",
+            "items": {
+                "en": [
+                    "Team: ticket suggestions that were already asked (or something similar) disappear, new ones move up"
+                ],
+                "de": [
+                    "Team: Ticket-Vorschläge, die schon gefragt wurden (oder ähnlich), verschwinden – neue rücken nach"
+                ]
+            }
+        },
         {
             "version": "1.4.2",
             "date": "2026-11-09",

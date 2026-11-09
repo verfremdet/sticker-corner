@@ -11,7 +11,7 @@ import { Alerts, GuildMemberStore, MessageStore, RestAPI, showToast, useEffect, 
 
 import { lang } from "../i18n";
 import { findSticker, prepareSticker, sendSticker } from "../store";
-import { GATEKEEPERS, GREET_STICKER_RE, GREET_TEXT, GUILD_ID } from "./config";
+import { GATEKEEPERS, GREET_STICKER_RE, GREET_TEXT, GUILD_ID, VISIBLE_SUGGESTIONS } from "./config";
 import { creatorOf, isApproved, isTeamMember, loadVotes, setText, subscribe, suggestions, tallyFor, toggleVote, voteChannel, VoteKind } from "./store";
 
 const cl = classNameFactory("vc-sct-");
@@ -44,6 +44,20 @@ function nameOf(userId: string) {
     const member = GuildMemberStore.getMember(GUILD_ID, userId);
     const user = UserStore.getUser(userId);
     return member?.nick ?? (user as any)?.globalName ?? user?.username ?? "?";
+}
+
+const wordsOf = (s: string) => new Set(s.toLowerCase().split(/[^\p{L}\p{N}']+/u).filter(w => w.length > 1));
+
+/** Same or similar text: contains it, or at least 60 % of the suggestion's words appear in the message */
+function similar(message: string, suggestion: string): boolean {
+    const m = message.toLowerCase().trim(), s = suggestion.toLowerCase().trim();
+    if (!m || !s) return false;
+    if (m.includes(s) || (m.length > 12 && s.includes(m))) return true;
+    const sw = wordsOf(s), mw = wordsOf(m);
+    if (!sw.size) return false;
+    let hit = 0;
+    for (const w of sw) if (mw.has(w)) hit++;
+    return hit / sw.size >= 0.6;
 }
 
 function PencilIcon() {
@@ -111,9 +125,13 @@ export function TicketBar({ channel }: { channel: Channel; }) {
     const me = UserStore.getCurrentUser()?.id;
     const creatorId = creatorOf(channel);
     // Greeting until someone from the team has written in this ticket
-    const teamWrote = useStateFromStores([MessageStore], () =>
-        ((MessageStore.getMessages(channel.id) as any)?._array as any[] ?? []).some(m => !m.author?.bot && isTeamMember(m.author.id))
-    );
+    // Everything the team has written in this ticket (for the greeting and to hide what was already asked)
+    const teamTexts = useStateFromStores([MessageStore], () =>
+        ((MessageStore.getMessages(channel.id) as any)?._array as any[] ?? [])
+            .filter(m => !m.author?.bot && isTeamMember(m.author.id))
+            .map(m => String(m.content ?? "")),
+    undefined, (a: string[], b: string[]) => a.length === b.length && a.every((x, i) => x === b[i]));
+    const teamWrote = teamTexts.length > 0;
 
     // Upload the greeting GIF ahead of time so the click sends instantly
     useEffect(() => {
@@ -164,7 +182,10 @@ export function TicketBar({ channel }: { channel: Channel; }) {
     };
 
     const phase = approved ? "welcome" : "vibe";
-    const chips = suggestions().filter(s => s.phase === phase);
+    // Hide every group from which someone already sent this or a similar question; show the next ones instead
+    const all = suggestions();
+    const usedGroups = new Set(all.filter(s => teamTexts.some(m => similar(m, s.text))).map(s => s.group));
+    const chips = all.filter(s => s.phase === phase && !usedGroups.has(s.group)).slice(0, VISIBLE_SUGGESTIONS);
 
     return (
         <div className={cl("bar")}>
