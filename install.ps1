@@ -21,6 +21,12 @@ function Step($n, $text) { Write-Host "`n[$n/5] $text" -ForegroundColor Cyan }
 function Check($what) { if ($LASTEXITCODE -ne 0) { throw "$(L 'Failed' 'Fehler bei'): $what (code $LASTEXITCODE)" } }
 function Refresh-Path { $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User") }
 
+function Start-Discord {
+    if (Get-Process Discord -ErrorAction SilentlyContinue) { return }
+    $update = Join-Path $env:LOCALAPPDATA "Discord\Update.exe"
+    if (Test-Path $update) { Start-Process $update -ArgumentList "--processStart", "Discord.exe" }
+}
+
 function Install-StickerCorner {
     Step 1 (L "Checking tools (git, Node.js, pnpm)" "Werkzeuge prüfen (git, Node.js, pnpm)")
     if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
@@ -83,7 +89,15 @@ function Install-StickerCorner {
     $discord = Get-Process Discord -ErrorAction SilentlyContinue
     if ($discord) { Write-Host (L "Closing Discord for a moment ..." "Discord wird kurz geschlossen ..."); $discord | Stop-Process -Force; Start-Sleep 2 }
     Push-Location $Vencord
-    try { pnpm inject --branch auto; Check "pnpm inject" } finally { Pop-Location }
+    try {
+        # Vencord's installer is downloaded from GitHub; retry on short GitHub outages (504)
+        for ($try = 1; $try -le 3; $try++) {
+            pnpm inject --branch auto
+            if ($LASTEXITCODE -eq 0) { break }
+            if ($try -lt 3) { Write-Host (L "GitHub did not respond, retrying in 10 s ..." "GitHub hat nicht geantwortet, neuer Versuch in 10 s ..."); Start-Sleep 10 }
+        }
+        Check "pnpm inject"
+    } finally { Pop-Location }
 
     # Enable the plugin right away (Discord is closed now). Keeps existing plugin settings.
     $settingsDir = Join-Path $env:APPDATA "Vencord\settings"
@@ -100,14 +114,14 @@ function Install-StickerCorner {
     }
     [IO.File]::WriteAllText($settingsFile, ($cfg | ConvertTo-Json -Depth 50), (New-Object Text.UTF8Encoding $false))
 
-    $update = Join-Path $env:LOCALAPPDATA "Discord\Update.exe"
-    if (Test-Path $update) { Start-Process $update -ArgumentList "--processStart", "Discord.exe" }
+    Start-Discord
 
     Write-Host (L "`nDone. Discord is restarting." "`nFertig. Discord startet neu.") -ForegroundColor Green
     Write-Host (L "Open the sticker picker in any chat -> tab 'STICKER CORNER'." "Im Chat das Stickerfenster öffnen -> Reiter 'STICKER CORNER'.")
 }
 
 try { Install-StickerCorner } catch {
+    Start-Discord  # never leave Discord closed
     Write-Host "`n$_" -ForegroundColor Red
     Write-Host (L "Installation stopped. Take a screenshot of this window if you need help." "Installation abgebrochen. Mach einen Screenshot von diesem Fenster, wenn du Hilfe brauchst.")
 }

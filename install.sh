@@ -56,7 +56,12 @@ step 4 "$(L "Building (about 1 minute)" "Bauen (etwa 1 Minute)")"
 (cd "$VENCORD" && pnpm install --frozen-lockfile && pnpm build)
 
 step 5 "$(L "Installing into Discord" "In Discord installieren")"
-(cd "$VENCORD" && pnpm inject --branch auto)
+# Vencord's installer is downloaded from GitHub; retry on short GitHub outages
+for try in 1 2 3; do
+    (cd "$VENCORD" && pnpm inject --branch auto) && break
+    [ "$try" = 3 ] && exit 1
+    sleep 10
+done
 
 # Enable the plugin right away (keeps existing plugin settings)
 if [ "$(uname)" = "Darwin" ]; then SETTINGS="$HOME/Library/Application Support/Vencord/settings/settings.json"
