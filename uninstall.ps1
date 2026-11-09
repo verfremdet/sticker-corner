@@ -14,7 +14,8 @@ if ($discord) { Write-Host (L "Closing Discord for a moment ..." "Discord wird k
 
 if (Test-Path (Join-Path $Vencord "package.json")) {
     Push-Location $Vencord
-    try { pnpm uninject --branch auto } finally { Pop-Location }
+    # pnpm.cmd, not pnpm: pnpm.ps1 is blocked by Windows' default script policy
+    try { pnpm.cmd uninject --branch auto } finally { Pop-Location }
 }
 if (Test-Path $Root) { Remove-Item -Recurse -Force $Root }
 

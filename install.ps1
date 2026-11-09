@@ -39,13 +39,15 @@ function Install-StickerCorner {
         winget install --id OpenJS.NodeJS.LTS -e --silent --accept-source-agreements --accept-package-agreements
         Refresh-Path
     }
-    foreach ($tool in "git", "node", "npm") {
+    # npm.cmd / pnpm.cmd instead of npm / pnpm: PowerShell would pick npm.ps1 / pnpm.ps1,
+    # which Windows blocks by default ("running scripts is disabled on this system").
+    foreach ($tool in "git", "node", "npm.cmd") {
         if (-not (Get-Command $tool -ErrorAction SilentlyContinue)) {
             throw (L "$tool is missing. Open a new PowerShell window and run the command again." "$tool fehlt. Neues PowerShell-Fenster öffnen und den Befehl nochmal ausführen.")
         }
     }
-    if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) {
-        npm install -g pnpm | Out-Null; Check "npm install -g pnpm"
+    if (-not (Get-Command pnpm.cmd -ErrorAction SilentlyContinue)) {
+        npm.cmd install -g pnpm | Out-Null; Check "npm install -g pnpm"
         Refresh-Path
     }
 
@@ -81,8 +83,8 @@ function Install-StickerCorner {
     Step 4 (L "Building (about 1 minute)" "Bauen (etwa 1 Minute)")
     Push-Location $Vencord
     try {
-        pnpm install --frozen-lockfile; Check "pnpm install"
-        pnpm build; Check "pnpm build"
+        pnpm.cmd install --frozen-lockfile; Check "pnpm install"
+        pnpm.cmd build; Check "pnpm build"
     } finally { Pop-Location }
 
     Step 5 (L "Installing into Discord" "In Discord installieren")
@@ -92,7 +94,7 @@ function Install-StickerCorner {
     try {
         # Vencord's installer is downloaded from GitHub; retry on short GitHub outages (504)
         for ($try = 1; $try -le 3; $try++) {
-            pnpm inject --branch auto
+            pnpm.cmd inject --branch auto
             if ($LASTEXITCODE -eq 0) { break }
             if ($try -lt 3) { Write-Host (L "GitHub did not respond, retrying in 10 s ..." "GitHub hat nicht geantwortet, neuer Versuch in 10 s ..."); Start-Sleep 10 }
         }
