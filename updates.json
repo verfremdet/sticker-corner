@@ -1,6 +1,18 @@
 {
-    "version": "1.4.3",
+    "version": "1.4.4",
     "news": [
+        {
+            "version": "1.4.4",
+            "date": "2026-11-09",
+            "items": {
+                "en": [
+                    "Team: after the first question, the ticket bar suggests an explanation why we ask – in different words"
+                ],
+                "de": [
+                    "Team: Nach der ersten Frage schlägt die Ticket-Leiste eine Erklärung vor, warum wir fragen – mit anderen Worten"
+                ]
+            }
+        },
         {
             "version": "1.4.3",
             "date": "2026-11-09",

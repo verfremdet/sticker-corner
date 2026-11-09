@@ -184,8 +184,12 @@ export function TicketBar({ channel }: { channel: Channel; }) {
     const phase = approved ? "welcome" : "vibe";
     // Hide every group from which someone already sent this or a similar question; show the next ones instead
     const all = suggestions();
-    const usedGroups = new Set(all.filter(s => teamTexts.some(m => similar(m, s.text))).map(s => s.group));
-    const chips = all.filter(s => s.phase === phase && !usedGroups.has(s.group)).slice(0, VISIBLE_SUGGESTIONS);
+    const usedGroups = new Set(all.filter(s => teamTexts.some(m =>
+        similar(m, s.text) || (s.keys ?? []).some(k => m.toLowerCase().includes(k))
+    )).map(s => s.group));
+    const open = all.filter(s => s.phase === phase && !usedGroups.has(s.group) && (!s.after || usedGroups.has(s.after)));
+    // follow-ups (e.g. the explanation right after the question) come first
+    const chips = [...open.filter(s => s.after), ...open.filter(s => !s.after)].slice(0, VISIBLE_SUGGESTIONS);
 
     return (
         <div className={cl("bar")}>
