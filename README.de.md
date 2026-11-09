@@ -29,6 +29,10 @@ Sticker-Channel ──(Bot, nur Lesen)──► stickers.verfremdet.com ──�
 - **„Zu Sticker Corner hinzufügen“** (Rechtsklick auf ein Bild): nur sichtbar, wenn du sowieso in den Sticker-Channel posten darfst.
   Es lädt dieses eine Bild von Discords eigenen Servern und postet es mit dem eingegebenen Namen in den Sticker-Channel
   ([`contextMenu.tsx`](plugin/stickerCorner/contextMenu.tsx)).
+- **Ticket-Helfer fürs Team** ([`tickets/`](plugin/stickerCorner/tickets)): nur für Mitglieder mit den Team-Rollen des
+  Night-Corner-Servers, in `ticket-…`-Kanälen. Eine Leiste über dem Eingabefeld zeigt Antwort-Vorschläge (gesendet nur per Klick),
+  Abstimmungen und einen Bann-Knopf (nur nach Bestätigung, Nachrichten bleiben). Stimmen sind kurze Nachrichten im Team-Kanal
+  `#ticket-votes`. Alle anderen sehen davon nichts.
 - Es liest weder deinen Token noch dein Passwort oder deine Nachrichten und schickt keine Daten über dich weg.
 - **Updates:** Der Update-Knopf holt dieses Repo per git und baut Vencord neu. Von anderswo wird nichts geladen.
 

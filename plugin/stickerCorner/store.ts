@@ -142,8 +142,10 @@ export function toggleFavorite(id: string) {
     emit();
 }
 
+export const findSticker = (pred: (s: Sticker) => boolean) => stickers.find(pred);
+
 /** Loads the image and sends it to the channel as a normal image upload. */
-export async function sendSticker(sticker: Sticker, channelId: string) {
+export async function sendSticker(sticker: Sticker, channelId: string): Promise<boolean> {
     remember(sticker.id);
 
     const original = settings.store.sendSize === "original";
@@ -156,7 +158,7 @@ export async function sendSticker(sticker: Sticker, channelId: string) {
         blob = await res.blob();
     } catch {
         showToast({ text: t("loadFailed"), variant: "critical" });
-        return;
+        return false;
     }
 
     const ext = fileName.split(".").pop();
@@ -167,6 +169,7 @@ export async function sendSticker(sticker: Sticker, channelId: string) {
 
     const ok = await uploadFile(file, channelId, "", reply ? MessageActions.getSendMessageOptionsForReply(reply)?.messageReference : null);
     if (ok) reportUse(sticker.id);
+    return ok;
 }
 
 const safeFileName = (name: string) => name.replace(/[^\p{L}\p{N} _-]/gu, "").trim().replace(/\s+/g, "_").slice(0, 40) || "sticker";

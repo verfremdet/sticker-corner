@@ -19,6 +19,8 @@ import { settings } from "./settings";
 import { cl, StickerCornerPanel } from "./StickerCorner";
 import { start, stop } from "./store";
 import { startUpdater, stopUpdater } from "./updater";
+import { isTeam, isTicket, startTickets, stopTickets } from "./tickets/store";
+import { TicketBar } from "./tickets/TicketBar";
 import { VERSION } from "./version";
 
 interface PanelArgs {
@@ -58,8 +60,31 @@ export default definePlugin({
                     replace: ":null,$self.renderPanel({activeView:$1,channel:$2,close:$3}),"
                 }
             ]
+        },
+        {
+            // Ticket helper: own bar above the message box (where "Replying to …" sits)
+            find: "selectedAutocompleteInputError:",
+            replacement: {
+                match: /(let\{channel:(\i),type:(\i),activeCommand:\i,pendingReply:.{0,2500}?)\{stacked:(\i),floating:(\i)\}/,
+                replace: "$1($self.addTicketBar($4,$2,$3),{stacked:$4,floating:$5})"
+            }
         }
     ],
+
+    addTicketBar(stacked: ReactNode[], channel: Channel, type: any) {
+        try {
+            // only the normal message box (not threads/edit), only in tickets, only for the team
+            if (type?.analyticsName !== "normal") return;
+            if (!isTicket(channel) || !isTeam()) return;
+            stacked.unshift(
+                <ErrorBoundary key="vc-sct-bar" noop>
+                    <TicketBar channel={channel} />
+                </ErrorBoundary>
+            );
+        } catch (e) {
+            console.error("[StickerCorner] ticket bar:", e);
+        }
+    },
 
     renderTab(Tab: ComponentType<any>, activeView: string): ReactNode {
         const active = activeView === VIEW;
@@ -92,9 +117,11 @@ export default definePlugin({
     start() {
         start();
         startUpdater();
+        startTickets();
     },
     stop() {
         stop();
         stopUpdater();
+        stopTickets();
     },
 });

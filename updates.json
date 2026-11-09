@@ -1,6 +1,18 @@
 {
-    "version": "1.3.0",
+    "version": "1.4.0",
     "news": [
+        {
+            "version": "1.4.0",
+            "date": "2026-11-09",
+            "items": {
+                "en": [
+                    "Team only: ticket helper above the message box (suggestions, votes, ban)"
+                ],
+                "de": [
+                    "Nur fürs Team: Ticket-Helfer über dem Eingabefeld (Vorschläge, Abstimmung, Bann)"
+                ]
+            }
+        },
         {
             "version": "1.3.0",
             "date": "2026-11-09",
