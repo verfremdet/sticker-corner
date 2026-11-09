@@ -5,7 +5,7 @@ import { stat } from "node:fs/promises";
 import http from "node:http";
 import path from "node:path";
 import { Client, Events, GatewayIntentBits, Partials } from "discord.js";
-import { mediaExt, Store, TYPE_BY_EXT } from "./store.js";
+import { cleanText, mediaExt, Store, TYPE_BY_EXT } from "./store.js";
 
 const { DISCORD_TOKEN, CHANNEL_ID } = process.env;
 const PORT = Number(process.env.PORT ?? 8790);
@@ -69,9 +69,22 @@ const client = new Client({
 
 const isOurChannel = msg => msg.channelId === CHANNEL_ID;
 
-async function addMessage(message) {
+const hasMedia = message => [...message.attachments.values()].some(a => mediaExt(a));
+/** Antwort ohne eigenes Bild → benennt das Bild, auf das geantwortet wurde */
+const replyTarget = message =>
+    !message.author?.bot && !hasMedia(message) ? message.reference?.messageId ?? null : null;
+
+async function addMessage(message, { live = true } = {}) {
     // Bot messages (e.g. the pinned how-to with screenshot) are never stickers
     if (message.author?.bot) return;
+    const target = replyTarget(message);
+    if (target) {
+        if (store.nameByReply(target, message) && live && cleanText(message.content)) {
+            console.log(`Name: "${message.content}" (${message.author?.username})`);
+            message.react("✅").catch(() => {});
+        }
+        return;
+    }
     for (const attachment of message.attachments.values()) {
         if (!mediaExt(attachment)) continue;
         try {
@@ -88,18 +101,23 @@ async function fullSync() {
     if (!channel?.isTextBased()) throw new Error(`Channel ${CHANNEL_ID} nicht lesbar`);
 
     const seen = new Set();
+    const replies = [];
     let before;
     for (;;) {
         const batch = await channel.messages.fetch({ limit: 100, before });
         if (batch.size === 0) break;
         for (const message of batch.values()) {
             if (!message.author?.bot) for (const a of message.attachments.values()) if (mediaExt(a)) seen.add(a.id);
-            await addMessage(message);
+            // Antworten erst nach allen Bildern anwenden (Verlauf kommt von neu nach alt)
+            if (replyTarget(message)) replies.push(message);
+            else await addMessage(message, { live: false });
         }
         before = batch.last().id;
         if (batch.size < 100) break;
     }
     for (const id of [...store.stickers.keys()]) if (!seen.has(id)) await store.remove(id);
+    for (const r of replies) store.nameByReply(replyTarget(r), r);
+    store.pruneReplies(new Set(replies.map(r => r.id)));
     console.log(`Abgleich fertig: ${store.stickers.size} Sticker`);
 }
 
@@ -117,17 +135,24 @@ client.on(Events.MessageCreate, m => isOurChannel(m) && addMessage(m));
 client.on(Events.MessageDelete, async m => {
     if (!isOurChannel(m)) return;
     for (const id of store.idsOfMessage(m.id)) await store.remove(id);
+    store.dropReply(m.id);
 });
 
 client.on(Events.MessageBulkDelete, async (messages, channel) => {
     if (channel.id !== CHANNEL_ID) return;
-    for (const m of messages.values()) for (const id of store.idsOfMessage(m.id)) await store.remove(id);
+    for (const m of messages.values()) {
+        for (const id of store.idsOfMessage(m.id)) await store.remove(id);
+        store.dropReply(m.id);
+    }
 });
 
 client.on(Events.MessageUpdate, async (_old, m) => {
     if (!isOurChannel(m)) return;
     if (m.partial) m = await m.fetch().catch(() => null);
     if (!m) return;
+    // Bearbeitete Antwort → Name mitziehen
+    const target = replyTarget(m);
+    if (target) return void store.nameByReply(target, m);
     // Anhänge, die beim Bearbeiten entfernt wurden, rauswerfen
     const now = new Set(m.attachments.keys());
     for (const id of store.idsOfMessage(m.id)) if (!now.has(id)) await store.remove(id);

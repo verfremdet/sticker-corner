@@ -158,10 +158,12 @@ export class Store {
         await this.writeAtomic(file, buf);
         const sendFile = await this.writeSmall(attachment.id, buf, fileExt);
 
+        const baseName = stickerName(message, attachment);
         this.stickers.set(attachment.id, {
             id: attachment.id,
             messageId: message.id,
-            name: stickerName(message, attachment),
+            name: baseName,
+            baseName,
             file,
             sendFile,
             width,
@@ -208,17 +210,71 @@ export class Store {
         }
     }
 
+    /** Original-Nachricht bearbeitet: Grundname neu (eine Antwort-Benennung geht weiter vor) */
     updateName(messageId, message) {
         let touched = false;
         for (const id of this.idsOfMessage(messageId)) {
             const s = this.stickers.get(id);
-            const name = stickerName(message, { name: s.file });
-            if (message.content?.trim() && s.name !== name) {
-                s.name = name;
-                touched = true;
-            }
+            if (!message.content?.trim()) continue;
+            s.baseName = stickerName(message, { name: s.file });
+            touched = this.recomputeName(s) || touched;
         }
         if (touched) this.changed();
+    }
+
+    /**
+     * Antwort auf ein Sticker-Bild = neuer Name. Jede Antwort wird gemerkt;
+     * es gilt die neueste. Wird sie gelöscht, gilt wieder die davor (oder der Grundname).
+     * @returns true, wenn die Antwort zu einem Sticker gehört
+     */
+    nameByReply(targetMessageId, reply) {
+        const ids = this.idsOfMessage(targetMessageId);
+        if (!ids.length) return false;
+        const text = cleanText(reply.content);
+        let touched = false;
+        for (const id of ids) {
+            const s = this.stickers.get(id);
+            s.names = (s.names ?? []).filter(n => n.id !== reply.id);
+            if (text) s.names.push({ id: reply.id, at: reply.createdTimestamp, text: text.slice(0, 60) });
+            touched = this.recomputeName(s) || touched;
+        }
+        if (touched) this.changed();
+        return true;
+    }
+
+    /** Antwort gelöscht → ihren Namen zurücknehmen */
+    dropReply(replyId) {
+        let touched = false;
+        for (const s of this.stickers.values()) {
+            if (!s.names?.some(n => n.id === replyId)) continue;
+            s.names = s.names.filter(n => n.id !== replyId);
+            this.recomputeName(s);
+            touched = true;
+        }
+        if (touched) this.changed();
+    }
+
+    /** Beim Abgleich: Namen aus Antworten entfernen, die es nicht mehr gibt */
+    pruneReplies(existingIds) {
+        let touched = false;
+        for (const s of this.stickers.values()) {
+            if (!s.names?.length) continue;
+            const kept = s.names.filter(n => existingIds.has(n.id));
+            if (kept.length === s.names.length) continue;
+            s.names = kept;
+            this.recomputeName(s);
+            touched = true;
+        }
+        if (touched) this.changed();
+    }
+
+    recomputeName(s) {
+        s.baseName ??= s.name;
+        const latest = (s.names ?? []).reduce((a, b) => (!a || b.at >= a.at ? b : a), null);
+        const name = latest?.text ?? s.baseName;
+        if (s.name === name) return false;
+        s.name = name;
+        return true;
     }
 
     async remove(id) {
@@ -243,8 +299,13 @@ export class Store {
     }
 }
 
+/** Text ohne Custom-Emojis, Erwähnungen und Links */
+export function cleanText(content) {
+    return (content ?? "").replace(/<a?:\w+:\d+>|<@[!&]?\d+>|<#\d+>|https?:\/\/\S+/g, "").replace(/\s+/g, " ").trim();
+}
+
 function stickerName(message, attachment) {
-    const text = (message.content ?? "").replace(/<a?:\w+:\d+>|https?:\/\/\S+/g, "").trim();
+    const text = cleanText(message.content);
     if (text) return text.slice(0, 60);
     return (attachment.name ?? "Sticker").replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").slice(0, 60);
 }
