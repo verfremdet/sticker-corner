@@ -183,9 +183,9 @@ export const findSticker =(pred: (s: Sticker) => boolean) => stickers.find(pred)
 // Sending used to be: load image → upload to Discord → post message, all after the click.
 // Now the first two steps start as soon as the mouse rests on a sticker; the click only posts.
 const PREPARE_TTL = 20 * 60_000;
-const PREPARE_MAX = 8;
+const PREPARE_MAX = 12;
 const blobs = new Map<string, Promise<Blob>>();
-const prepared = new Map<string, { at: number; upload: Promise<Uploaded | null>; }>();
+const prepared = new Map<string, Prepared>();
 
 const sendFileOf = (s: Sticker) => settings.store.sendSize === "original" ? s.file : s.sendFile ?? s.file;
 
@@ -208,6 +208,11 @@ async function stickerFile(s: Sticker): Promise<File> {
     return new File([blob], `${safeFileName(s.name)}.${fileName.split(".").pop()}`, { type: blob.type });
 }
 
+/** Load the small images in the background (picker open) so a click never waits for our server */
+export function warmBlobs(list: Sticker[]) {
+    for (const s of list.slice(0, 80)) loadBlob(sendFileOf(s)).catch(() => { });
+}
+
 /** Start loading + uploading in the background (hover/focus). Each upload is used once. */
 export function prepareSticker(s: Sticker, channelId: string) {
     const key = `${channelId}:${sendFileOf(s)}`;
@@ -216,24 +221,39 @@ export function prepareSticker(s: Sticker, channelId: string) {
     if (prepared.has(key)) return;
     // keep only the newest few; older unused uploads simply expire on Discord's side
     while (prepared.size >= PREPARE_MAX) prepared.delete(prepared.keys().next().value!);
-    const upload = stickerFile(s).then(f => cloudUpload(f, channelId, false)).catch(() => null);
-    prepared.set(key, { at: now, upload });
+    const entry: Prepared = { at: now, upload: null, done: Promise.resolve(false) };
+    entry.done = stickerFile(s).then(file => new Promise<boolean>(resolve => {
+        const up = new CloudUpload({ file, isThumbnail: false, platform: CloudUploadPlatform.WEB }, channelId);
+        entry.upload = up;
+        up.on("complete", () => resolve(true));
+        up.on("error", () => resolve(false));
+        up.upload();
+    })).catch(() => false);
+    prepared.set(key, entry);
 }
 
-/** Sends the sticker as a normal image upload – instantly if it was prepared. */
+interface Prepared { at: number; upload: TCloudUpload | null; done: Promise<boolean>; }
+
+/**
+ * Sends the sticker as a normal image upload through Discord's own send path:
+ * the message shows up in the chat immediately (like when you send a picture yourself),
+ * and if the upload was prepared on hover, Discord only has to post it.
+ */
 export async function sendSticker(sticker: Sticker, channelId: string): Promise<boolean> {
     remember(sticker.id);
 
     const reply = PendingReplyStore.getPendingReply(channelId);
     if (reply) FluxDispatcher.dispatch({ type: "DELETE_PENDING_REPLY", channelId });
-    const ref = reply ? MessageActions.getSendMessageOptionsForReply(reply)?.messageReference : null;
+    const messageReference = reply ? MessageActions.getSendMessageOptionsForReply(reply)?.messageReference : undefined;
 
     const key = `${channelId}:${sendFileOf(sticker)}`;
     const ready = prepared.get(key);
     prepared.delete(key);
 
-    let up = ready && Date.now() - ready.at < PREPARE_TTL ? await ready.upload : null;
-    if (!up) {
+    let upload: TCloudUpload | null = null;
+    if (ready && Date.now() - ready.at < PREPARE_TTL && await ready.done) upload = ready.upload;
+    if (!upload) {
+        // not prepared: hand Discord a fresh upload – it shows the "sending" message right away and uploads itself
         let file: File;
         try {
             file = await stickerFile(sticker);
@@ -241,19 +261,23 @@ export async function sendSticker(sticker: Sticker, channelId: string): Promise<
             showToast({ text: t("loadFailed"), variant: "critical" });
             return false;
         }
-        up = await cloudUpload(file, channelId);
-        if (!up) return false;
+        upload = new CloudUpload({ file, isThumbnail: false, platform: CloudUploadPlatform.WEB }, channelId);
     }
 
-    let ok = await postAttachment(channelId, up, "", ref, !ready);
-    if (!ok && !ready) return false;
-    // a prepared upload can expire on Discord's side → upload again once
-    if (!ok && ready) {
-        const fresh = await stickerFile(sticker).then(f => cloudUpload(f, channelId)).catch(() => null);
-        ok = !!fresh && await postAttachment(channelId, fresh, "", ref);
+    try {
+        MessageActions.sendMessage(
+            channelId,
+            { content: "", tts: false, invalidEmojis: [], validNonShortcutEmojis: [] } as any,
+            true,
+            { attachmentsToUpload: [upload], ...(messageReference ? { messageReference } : {}) } as any,
+        );
+    } catch (e) {
+        console.warn("[StickerCorner] native send failed, falling back:", e);
+        const up = await stickerFile(sticker).then(f => cloudUpload(f, channelId)).catch(() => null);
+        if (!up || !await postAttachment(channelId, up, "", messageReference ?? null)) return false;
     }
-    if (ok) reportUse(sticker.id);
-    return ok;
+    reportUse(sticker.id);
+    return true;
 }
 
 const safeFileName = (name: string) => name.replace(/[^\p{L}\p{N} _-]/gu, "").trim().replace(/\s+/g, "_").slice(0, 40) || "sticker";

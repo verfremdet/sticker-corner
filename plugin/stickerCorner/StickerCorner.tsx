@@ -9,7 +9,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "@webpack/
 import { CategoryChip, categoriesOf, chipsFor } from "./categories";
 import { t } from "./i18n";
 import { openRenameModal } from "./contextMenu";
-import { canPost, prepareSticker, sendSticker, smallUrl, Sticker, toggleFavorite, useStickers } from "./store";
+import { canPost, prepareSticker, sendSticker, smallUrl, Sticker, toggleFavorite, useStickers, warmBlobs } from "./store";
 import { dismissWhatsNew, itemsOf, restartDiscord, runUpdate, useUpdate, useWhatsNew } from "./updater";
 import { VERSION } from "./version";
 
@@ -238,9 +238,17 @@ export function StickerCornerPanel({ channel, close }: Props) {
     const onHover = (s: Sticker | null) => {
         setHovered(s);
         clearTimeout(prepTimer.current);
-        if (s) prepTimer.current = setTimeout(() => prepareSticker(s, channel.id), 120);
+        if (s) prepTimer.current = setTimeout(() => prepareSticker(s, channel.id), 60);
     };
     useEffect(() => () => clearTimeout(prepTimer.current), []);
+
+    // Picker open: load all small images, and already upload the top favorites/recent → first click is instant
+    useEffect(() => {
+        if (!loaded || !stickers.length) return;
+        warmBlobs([...favorites, ...recent, ...stickers]);
+        const top = [...new Map([...favorites, ...recent].map(s => [s.id, s])).values()].slice(0, 4);
+        for (const s of top) prepareSticker(s, channel.id);
+    }, [loaded, stickers.length > 0, channel.id]);
 
     const canEdit = useMemo(() => canPost(), [stickers]);
     const handlers: TileHandlers = { onSend, onHover, isFavorite, canEdit };

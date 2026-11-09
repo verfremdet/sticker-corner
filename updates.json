@@ -1,6 +1,18 @@
 {
-    "version": "1.5.1",
+    "version": "1.5.2",
     "news": [
+        {
+            "version": "1.5.2",
+            "date": "2026-11-09",
+            "items": {
+                "en": [
+                    "Stickers appear in the chat instantly – sent through Discord’s own send path, top favorites are uploaded as soon as the picker opens"
+                ],
+                "de": [
+                    "Sticker stehen sofort im Chat – gesendet über Discords eigenen Sendeweg, die ersten Favoriten werden schon beim Öffnen hochgeladen"
+                ]
+            }
+        },
         {
             "version": "1.5.1",
             "date": "2026-11-09",
