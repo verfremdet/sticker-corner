@@ -593,24 +593,67 @@
     color: #1e1f22;
 }
 
-.vc-sct-gates {
+.vc-sct-vote-out.vc-sct-vote-mine {
+    background: #da373c;
+    color: #fff;
+}
+
+/* Abstimmung: Knöpfe + Namen bleiben zusammen, die drei Namen sind immer sichtbar */
+.vc-sct-poll {
     display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    min-width: 0;
+}
+
+.vc-sct-voters {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex: none;
+}
+
+.vc-sct-gate,
+.vc-sct-more {
+    display: inline-flex;
+    align-items: center;
     gap: 3px;
-}
-
-.vc-sct-gate {
-    padding: 1px 6px;
+    height: 22px;
+    padding: 0 8px 0 6px;
     border-radius: 999px;
-    font-size: 11px;
-    font-weight: 600;
-    background: rgb(0 0 0 / 25%);
-    opacity: 0.55;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+    flex: none;
+    transition: background-color 0.2s, color 0.2s, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-.vc-sct-gate-yes {
+.vc-sct-gate-mark {
+    width: 12px;
+    text-align: center;
+    font-size: 11px;
+}
+
+.vc-sct-gate-open {
+    background: rgb(0 0 0 / 22%);
+    color: var(--text-muted);
+}
+
+.vc-sct-gate-yes,
+.vc-sct-more-yes {
     background: #23a55a;
     color: #fff;
-    opacity: 1;
+}
+
+.vc-sct-gate-no,
+.vc-sct-more-no {
+    background: #da373c;
+    color: #fff;
+}
+
+.vc-sct-more {
+    padding: 0 8px;
 }
 
 .vc-sct-count {

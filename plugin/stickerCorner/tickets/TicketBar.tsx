@@ -12,13 +12,13 @@ import { Alerts, GuildMemberStore, MessageStore, RestAPI, showToast, useEffect, 
 import { lang } from "../i18n";
 import { findSticker, prepareSticker, sendSticker } from "../store";
 import { GATEKEEPERS, GREET_STICKER_RE, GREET_TEXT, GUILD_ID, VISIBLE_SUGGESTIONS } from "./config";
-import { creatorOf, isApproved, isTeamMember, loadVotes, setText, subscribe, suggestions, tallyFor, toggleVote, voteChannel, VoteKind } from "./store";
+import { creatorOf, isApproved, isTeamMember, loadVotes, setText, subscribe, suggestions, Tally, tallyFor, toggleVote, voteChannel, VoteKind } from "./store";
 
 const cl = classNameFactory("vc-sct-");
 
 const TEXT = {
     en: {
-        ticket: "Ticket", greet: "GIF + mhm mhm", in: "In", troll: "Troll", ban: "Ban",
+        ticket: "Ticket", greet: "GIF + mhm mhm", in: "In", out: "Out", troll: "Troll", ban: "Ban",
         noVoteChannel: "Create a team-only text channel named #ticket-votes to vote.",
         trollBanner: "TROLL THEM", approved: "Everyone's in – welcome texts below",
         banTitle: "Ban {name}?", banBody: "{name} is banned right away. Their messages stay.", banConfirm: "Ban now",
@@ -27,7 +27,7 @@ const TEXT = {
         stickerMissing: "Sticker “mhm…” not found in Sticker Corner",
     },
     de: {
-        ticket: "Ticket", greet: "GIF + mhm mhm", in: "Rein", troll: "Troll", ban: "Bann",
+        ticket: "Ticket", greet: "GIF + mhm mhm", in: "Rein", out: "Raus", troll: "Troll", ban: "Bann",
         noVoteChannel: "Leg einen Textkanal #ticket-votes nur fürs Team an, dann geht Abstimmen.",
         trollBanner: "TROLLT DEN", approved: "Alle sind dafür – Willkommens-Texte unten",
         banTitle: "{name} bannen?", banBody: "{name} wird sofort gebannt. Die Nachrichten bleiben.", banConfirm: "Jetzt bannen",
@@ -115,6 +115,31 @@ function VoteButton({ kind, voters, mine, onClick, children }: { kind: VoteKind;
         >
             {children}
         </button>
+    );
+}
+
+/**
+ * Who voted what: cya, verfremdet, x8one always first and always visible (green = in, red = out, grey = not yet),
+ * everyone else from the team as "+2 ✓" / "+1 ✕" (names on hover).
+ */
+function Voters({ tally }: { tally: Tally; }) {
+    const gateIds = GATEKEEPERS.map(g => g.id);
+    const otherIn = tally.in.filter(id => !gateIds.includes(id));
+    const otherOut = tally.out.filter(id => !gateIds.includes(id));
+    const state = (id: string) => tally.in.includes(id) ? "yes" : tally.out.includes(id) ? "no" : "open";
+    return (
+        <span className={cl("voters")}>
+            {GATEKEEPERS.map(g => {
+                const s = state(g.id);
+                return (
+                    <span key={g.id} className={cl("gate", `gate-${s}`)} title={`${g.name}: ${s === "yes" ? tt("in") : s === "no" ? tt("out") : "–"}`}>
+                        <span className={cl("gate-mark")}>{s === "yes" ? "✓" : s === "no" ? "✕" : "·"}</span>{g.name}
+                    </span>
+                );
+            })}
+            {otherIn.length > 0 && <span className={cl("more", "more-yes")} title={otherIn.map(nameOf).join(", ")}>+{otherIn.length} ✓</span>}
+            {otherOut.length > 0 && <span className={cl("more", "more-no")} title={otherOut.map(nameOf).join(", ")}>+{otherOut.length} ✕</span>}
+        </span>
     );
 }
 
@@ -206,14 +231,15 @@ export function TicketBar({ channel }: { channel: Channel; }) {
                 </span>
                 {hasVoteChannel ? (
                     <>
-                        <VoteButton kind="in" voters={tally.in} mine={!!me && tally.in.includes(me)} onClick={() => vote("in")}>
-                            {tt("in")}
-                            <span className={cl("gates")}>
-                                {GATEKEEPERS.map(g => (
-                                    <span key={g.id} className={cl("gate", tally.in.includes(g.id) && "gate-yes")}>{g.name}</span>
-                                ))}
-                            </span>
-                        </VoteButton>
+                        <div className={cl("poll")}>
+                            <VoteButton kind="in" voters={tally.in} mine={!!me && tally.in.includes(me)} onClick={() => vote("in")}>
+                                ✓ {tt("in")}
+                            </VoteButton>
+                            <VoteButton kind="out" voters={tally.out} mine={!!me && tally.out.includes(me)} onClick={() => vote("out")}>
+                                ✕ {tt("out")}
+                            </VoteButton>
+                            <Voters tally={tally} />
+                        </div>
                         <VoteButton kind="troll" voters={tally.troll} mine={!!me && tally.troll.includes(me)} onClick={() => vote("troll")}>
                             {tt("troll")}{tally.troll.length > 0 && <span className={cl("count")}>{tally.troll.length}</span>}
                         </VoteButton>

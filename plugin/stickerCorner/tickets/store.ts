@@ -12,9 +12,9 @@ import { ChannelStore, Constants, FluxDispatcher, GuildMemberStore, RestAPI, Use
 
 import { DEFAULT_SUGGESTIONS, GATEKEEPERS, GUILD_ID, Suggestion, TEAM_ROLES, TICKET_NAME_RE, VOTE_CHANNEL_NAME } from "./config";
 
-export type VoteKind = "in" | "troll" | "ban";
-const KINDS: VoteKind[] = ["in", "troll", "ban"];
-const VOTE_RE = /^<#(\d{5,25})> · (in|troll|ban)$/;
+export type VoteKind = "in" | "out" | "troll" | "ban";
+const KINDS: VoteKind[] = ["in", "out", "troll", "ban"];
+const VOTE_RE = /^<#(\d{5,25})> · (in|out|troll|ban)$/;
 
 const TEXTS_KEY = "StickerCorner_ticketTexts";
 const MEMBER_OVERWRITE = 1;
@@ -118,12 +118,19 @@ export const subscribe = (l: () => void) => { listeners.add(l); return () => voi
 export type Tally = Record<VoteKind, string[]>;
 
 export function tallyFor(ticketId: string): Tally {
-    const t: Tally = { in: [], troll: [], ban: [] };
-    for (const v of votes.values()) if (v.ticketId === ticketId && !t[v.kind].includes(v.userId)) t[v.kind].push(v.userId);
+    const t: Tally = { in: [], out: [], troll: [], ban: [] };
+    const list = [...votes.values()].filter(v => v.ticketId === ticketId)
+        .sort((a, b) => a.messageId.length - b.messageId.length || (a.messageId < b.messageId ? -1 : 1));
+    for (const v of list) {
+        // in/out: the newer vote of a person wins
+        if (v.kind === "in") t.out = t.out.filter(u => u !== v.userId);
+        if (v.kind === "out") t.in = t.in.filter(u => u !== v.userId);
+        if (!t[v.kind].includes(v.userId)) t[v.kind].push(v.userId);
+    }
     return t;
 }
 
-export const isApproved = (t: Tally) => GATEKEEPERS.every(g => t.in.includes(g.id));
+export const isApproved = (t: Tally) => GATEKEEPERS.every(g => t.in.includes(g.id) && !t.out.includes(g.id));
 
 /** Vote or take the vote back (deletes my vote message) */
 export async function toggleVote(ticketId: string, kind: VoteKind): Promise<boolean> {
@@ -138,6 +145,14 @@ export async function toggleVote(ticketId: string, kind: VoteKind): Promise<bool
         }
         emit();
         return true;
+    }
+    // "in" and "out" exclude each other: switching sides removes the old vote
+    const opposite = kind === "in" ? "out" : kind === "out" ? "in" : null;
+    if (opposite) {
+        for (const v of [...votes.values()].filter(v => v.ticketId === ticketId && v.kind === opposite && v.userId === me)) {
+            await RestAPI.del({ url: Constants.Endpoints.MESSAGE(ch.id, v.messageId) }).catch(() => { });
+            votes.delete(v.messageId);
+        }
     }
     const res = await RestAPI.post({
         url: Constants.Endpoints.MESSAGES(ch.id),

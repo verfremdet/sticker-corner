@@ -1,6 +1,18 @@
 {
-    "version": "1.4.4",
+    "version": "1.4.5",
     "news": [
+        {
+            "version": "1.4.5",
+            "date": "2026-11-09",
+            "items": {
+                "en": [
+                    "Team: vote In or Out in tickets – cya, verfremdet, x8one always shown first, everyone else as +number"
+                ],
+                "de": [
+                    "Team: Rein oder Raus im Ticket abstimmen – cya, verfremdet, x8one immer vorne, alle anderen als +Zahl"
+                ]
+            }
+        },
         {
             "version": "1.4.4",
             "date": "2026-11-09",
