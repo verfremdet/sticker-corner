@@ -1,0 +1,19 @@
+{
+    "version": "1.0.0",
+    "news": [
+        {
+            "version": "1.0.0",
+            "date": "2026-11-09",
+            "items": {
+                "en": [
+                    "First release: “Sticker Corner” tab with search, recently used and one-click sending",
+                    "Update button right in the tab"
+                ],
+                "de": [
+                    "Erste Version: Reiter „Sticker Corner“ mit Suche, „Zuletzt benutzt“ und Senden per Klick",
+                    "Update-Knopf direkt im Reiter"
+                ]
+            }
+        }
+    ]
+}

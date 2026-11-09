@@ -16,6 +16,8 @@ import type { ComponentType, ReactNode } from "react";
 import { settings } from "./settings";
 import { cl, StickerCornerPanel } from "./StickerCorner";
 import { start, stop } from "./store";
+import { startUpdater, stopUpdater } from "./updater";
+import { VERSION } from "./version";
 
 const VIEW = "stickercorner";
 
@@ -27,8 +29,8 @@ interface PanelArgs {
 
 export default definePlugin({
     name: "StickerCorner",
-    description: "Eigener Reiter „Sticker Corner“ im Auswahlfenster. Bilder aus dem Sticker-Channel, per Klick als Bild senden.",
-    authors: [{ name: "Vos", id: 0n }],
+    description: `Adds a “Sticker Corner” tab to the sticker picker: images from the sticker channel, sent with one click. Version ${VERSION}`,
+    authors: [{ name: "verfremdet", id: 0n }],
     settings,
 
     patches: [
@@ -77,6 +79,12 @@ export default definePlugin({
         );
     },
 
-    start,
-    stop,
+    start() {
+        start();
+        startUpdater();
+    },
+    stop() {
+        stop();
+        stopUpdater();
+    },
 });

@@ -154,6 +154,7 @@
 }
 
 .vc-sc-empty {
+    white-space: pre-line;
     padding: 48px 16px;
     text-align: center;
     color: var(--text-muted);
@@ -203,4 +204,85 @@
 .vc-sc-footer-brand {
     font-size: 13px;
     color: var(--vc-sc-brand);
+}
+
+/* Update-Hinweis */
+.vc-sc-update {
+    margin: 0 16px 10px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: var(--background-secondary, rgb(255 255 255 / 4%));
+    border-left: 3px solid var(--vc-sc-accent);
+    font-size: 14px;
+    color: var(--text-normal, var(--text-default));
+}
+
+.vc-sc-update-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.vc-sc-update-text {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 10px;
+    min-width: 0;
+}
+
+.vc-sc-update-link {
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--text-link, #00a8fc);
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.vc-sc-update-link:hover {
+    text-decoration: underline;
+}
+
+.vc-sc-update-btn {
+    flex: none;
+    padding: 6px 14px;
+    border: none;
+    border-radius: 6px;
+    background: var(--vc-sc-accent);
+    color: #fff;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.15s;
+}
+
+.vc-sc-update-btn:hover {
+    transform: scale(1.06);
+    filter: brightness(1.1);
+}
+
+.vc-sc-update-btn:active {
+    transform: scale(0.94);
+}
+
+.vc-sc-update-busy {
+    flex: none;
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.vc-sc-update-error {
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--text-danger, #f23f43);
+}
+
+.vc-sc-update-news {
+    margin: 8px 0 0;
+    padding-left: 18px;
+    color: var(--text-muted);
+    font-size: 13px;
+    line-height: 1.5;
 }

@@ -6,7 +6,9 @@ import { classNameFactory } from "@utils/css";
 import { Channel } from "@vencord/discord-types";
 import { useMemo, useState } from "@webpack/common";
 
+import { t } from "./i18n";
 import { fileUrl, sendSticker, Sticker, useStickers } from "./store";
+import { itemsOf, restartDiscord, runUpdate, useUpdate } from "./updater";
 
 export const cl = classNameFactory("vc-sc-");
 
@@ -51,6 +53,39 @@ function Section({ title, stickers, ...rest }: { title: string; stickers: Sticke
     );
 }
 
+function UpdateBanner() {
+    const { available, latest, status, error, news } = useUpdate();
+    const [open, setOpen] = useState(false);
+    if (!available && status === "idle") return null;
+
+    let action: React.ReactNode;
+    if (status === "updating") action = <span className={cl("update-busy")}>{t("updating")}</span>;
+    else if (status === "done") action = <button className={cl("update-btn")} onClick={restartDiscord}>{t("restart")}</button>;
+    else action = <button className={cl("update-btn")} onClick={runUpdate}>{status === "error" ? t("retry") : t("updateNow")}</button>;
+
+    return (
+        <div className={cl("update")}>
+            <div className={cl("update-row")}>
+                <div className={cl("update-text")}>
+                    <b>{status === "done" ? t("updateInstalled") : t("updateAvailable", { v: latest ?? "" })}</b>
+                    {news.length > 0 && status !== "done" && (
+                        <button className={cl("update-link")} onClick={() => setOpen(o => !o)}>
+                            {open ? t("less") : t("whatsNew")}
+                        </button>
+                    )}
+                </div>
+                {action}
+            </div>
+            {status === "error" && <div className={cl("update-error")}>{error}</div>}
+            {open && (
+                <ul className={cl("update-news")}>
+                    {news.flatMap(n => itemsOf(n).map((item, i) => <li key={n.version + i}>{item}</li>))}
+                </ul>
+            )}
+        </div>
+    );
+}
+
 export function StickerCornerPanel({ channel, close }: Props) {
     const { stickers, recent, loaded, failed } = useStickers();
     const [query, setQuery] = useState("");
@@ -70,24 +105,25 @@ export function StickerCornerPanel({ channel, close }: Props) {
 
     let body: React.ReactNode;
     if (!loaded) {
-        body = <div className={cl("empty")}>Lädt …</div>;
+        body = <div className={cl("empty")}>{t("loading")}</div>;
     } else if (failed && !stickers.length) {
-        body = <div className={cl("empty")}>Sticker-Server nicht erreichbar.<br />Versuch es gleich nochmal.</div>;
+        body = <div className={cl("empty")}>{t("serverDown")}</div>;
     } else if (!stickers.length) {
-        body = <div className={cl("empty")}>Noch keine Sticker.<br />Poste ein Bild in den Sticker-Channel.</div>;
+        body = <div className={cl("empty")}>{t("empty")}</div>;
     } else if (!filtered.length) {
-        body = <div className={cl("empty")}>Nichts gefunden für „{query}“.</div>;
+        body = <div className={cl("empty")}>{t("noResults", { q: query })}</div>;
     } else {
         body = (
             <>
-                {!q && <Section title="Zuletzt benutzt" stickers={recent} onSend={onSend} onHover={setHovered} />}
-                <Section title={q ? `Treffer (${filtered.length})` : `Alle Sticker (${stickers.length})`} stickers={filtered} onSend={onSend} onHover={setHovered} />
+                {!q && <Section title={t("recent")} stickers={recent} onSend={onSend} onHover={setHovered} />}
+                <Section title={q ? t("results", { n: filtered.length }) : t("all", { n: stickers.length })} stickers={filtered} onSend={onSend} onHover={setHovered} />
             </>
         );
     }
 
     return (
         <div id="vc-stickercorner-panel" role="tabpanel" aria-labelledby="vc-stickercorner-tab" className={cl("panel")}>
+            <UpdateBanner />
             <div className={cl("header")}>
                 <label className={cl("search")}>
                     <SearchIcon />
@@ -95,7 +131,7 @@ export function StickerCornerPanel({ channel, close }: Props) {
                         autoFocus
                         value={query}
                         onChange={e => setQuery(e.currentTarget.value)}
-                        placeholder="Sticker Corner durchsuchen"
+                        placeholder={t("searchPlaceholder")}
                         spellCheck={false}
                     />
                 </label>
@@ -109,7 +145,7 @@ export function StickerCornerPanel({ channel, close }: Props) {
                         <img className={cl("footer-img")} src={fileUrl(hovered)} alt="" />
                         <div className={cl("footer-text")}>
                             <div className={cl("footer-name")}>{hovered.name}</div>
-                            {hovered.author && <div className={cl("footer-author")}>von {hovered.author}</div>}
+                            {hovered.author && <div className={cl("footer-author")}>{t("by", { name: hovered.author })}</div>}
                         </div>
                     </>
                 ) : (

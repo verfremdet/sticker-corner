@@ -5,7 +5,7 @@ import { stat } from "node:fs/promises";
 import http from "node:http";
 import path from "node:path";
 import { Client, Events, GatewayIntentBits, Partials } from "discord.js";
-import { imageExt, Store, TYPE_BY_EXT } from "./store.js";
+import { mediaExt, Store, TYPE_BY_EXT } from "./store.js";
 
 const { DISCORD_TOKEN, CHANNEL_ID } = process.env;
 const PORT = Number(process.env.PORT ?? 8790);
@@ -50,6 +50,11 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (url.pathname === "/health") return void res.writeHead(200).end("ok");
+
+    // Keine eigene Webseite: Startseite führt direkt zum öffentlichen Code auf GitHub
+    if (url.pathname === "/") {
+        return void res.writeHead(302, { Location: "https://github.com/verfremdet/sticker-corner" }).end();
+    }
     res.writeHead(404).end();
 });
 server.listen(PORT, "127.0.0.1", () => console.log(`HTTP auf 127.0.0.1:${PORT}`));
@@ -64,7 +69,7 @@ const isOurChannel = msg => msg.channelId === CHANNEL_ID;
 
 async function addMessage(message) {
     for (const attachment of message.attachments.values()) {
-        if (!imageExt(attachment)) continue;
+        if (!mediaExt(attachment)) continue;
         try {
             if (await store.add({ attachment, message })) console.log(`+ ${attachment.name} (${message.author?.username})`);
         } catch (e) {
@@ -84,7 +89,7 @@ async function fullSync() {
         const batch = await channel.messages.fetch({ limit: 100, before });
         if (batch.size === 0) break;
         for (const message of batch.values()) {
-            for (const a of message.attachments.values()) if (imageExt(a)) seen.add(a.id);
+            for (const a of message.attachments.values()) if (mediaExt(a)) seen.add(a.id);
             await addMessage(message);
         }
         before = batch.last().id;

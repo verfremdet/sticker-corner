@@ -8,6 +8,7 @@ import { CloudUploadPlatform } from "@vencord/discord-types/enums";
 import { findLazy } from "@webpack";
 import { Constants, FluxDispatcher, MessageActions, PendingReplyStore, RestAPI, showToast, SnowflakeUtils, useEffect, useState } from "@webpack/common";
 
+import { t } from "./i18n";
 import { settings } from "./settings";
 
 export interface Sticker {
@@ -46,7 +47,10 @@ export async function refresh() {
         const data = await res.json() as { version: number; stickers: Sticker[]; };
         const changed = data.version !== version || !loaded || failed;
         version = data.version;
-        stickers = data.stickers;
+        // Nur saubere Einträge übernehmen: Dateiname muss "<Zahl>.<Bildformat>" sein
+        stickers = (Array.isArray(data.stickers) ? data.stickers : []).filter(s =>
+            typeof s?.id === "string" && typeof s.file === "string" && /^\d+\.(png|jpg|gif|webp)$/.test(s.file)
+        ).map(s => ({ ...s, name: String(s.name ?? "").slice(0, 60), author: String(s.author ?? "").slice(0, 40) }));
         loaded = true;
         failed = false;
         if (changed) emit();
@@ -100,7 +104,7 @@ export async function sendSticker(sticker: Sticker, channelId: string) {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         blob = await res.blob();
     } catch {
-        showToast({ text: "Sticker konnte nicht geladen werden", variant: "critical" });
+        showToast({ text: t("loadFailed"), variant: "critical" });
         return;
     }
 
@@ -128,8 +132,8 @@ export async function sendSticker(sticker: Sticker, channelId: string) {
                 }],
                 message_reference: reply ? MessageActions.getSendMessageOptionsForReply(reply)?.messageReference : null,
             },
-        }).catch(() => showToast({ text: "Sticker konnte nicht gesendet werden", variant: "critical" }));
+        }).catch(() => showToast({ text: t("sendFailed"), variant: "critical" }));
     });
-    upload.on("error", () => showToast({ text: "Upload fehlgeschlagen", variant: "critical" }));
+    upload.on("error", () => showToast({ text: t("uploadFailed"), variant: "critical" }));
     upload.upload();
 }
