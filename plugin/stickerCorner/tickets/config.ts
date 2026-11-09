@@ -9,6 +9,9 @@ export const GUILD_ID = "1554642464583843902";
 export const TEAM_ROLES = ["1554674743469277285" /* Goat */, "1554642689138499604" /* Bad bitches */];
 
 /** These three must all vote "in" before the welcome suggestions show up */
+/** Given automatically when someone accepts the rules ("maybe not hhaaattt stupid?") */
+export const RULES_ROLE_ID = "1554715421788348476";
+
 export const GATEKEEPERS: { id: string; name: string; }[] = [
     { id: "1056331628621877268", name: "cya" },
     { id: "392749862950666240", name: "verfremdet" },

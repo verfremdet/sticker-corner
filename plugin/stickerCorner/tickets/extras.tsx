@@ -4,12 +4,12 @@
  */
 
 import { classNameFactory } from "@utils/css";
-import { Constants, GuildMemberStore, MessageStore, RestAPI, SnowflakeUtils, useEffect, useRef, useState, useStateFromStores } from "@webpack/common";
+import { Constants, GuildMemberStore, GuildRoleStore, MessageStore, RestAPI, SnowflakeUtils, useEffect, useRef, useState, useStateFromStores } from "@webpack/common";
 
 import { lang } from "../i18n";
 import { play, preloadSounds } from "../sounds";
 import { ageOn, findAge } from "./age";
-import { GUILD_ID, VIBE_QUESTIONS } from "./config";
+import { GUILD_ID, RULES_ROLE_ID, VIBE_QUESTIONS } from "./config";
 
 const cl = classNameFactory("vc-sct-");
 const de = () => lang() === "de";
@@ -38,7 +38,32 @@ function mutualGuilds(userId: string): Promise<number | null> {
 }
 
 /** One line with the most important facts about the person who opened the ticket */
+/** Accepting the rules gives the role "maybe not hhaaattt stupid?" automatically → has it = accepted */
+const RULES_ROLE_RE = /not\s*h*a+t+\s*stupid/i;
+
+function rulesRoleId(): string | null {
+    try {
+        const roles = (GuildRoleStore.getRolesSnapshot?.(GUILD_ID) ?? GuildRoleStore.getUnsafeMutableRoles?.(GUILD_ID) ?? {}) as Record<string, { id: string; name: string; }>;
+        if (roles[RULES_ROLE_ID]) return RULES_ROLE_ID;
+        return Object.values(roles).find(r => RULES_ROLE_RE.test(r.name))?.id ?? null; // in case the role is recreated
+    } catch {
+        return RULES_ROLE_ID;
+    }
+}
+
+/** true = accepted, false = not yet, null = can't tell (member not loaded) */
+function useRulesAccepted(userId: string): boolean | null {
+    return useStateFromStores([GuildMemberStore, GuildRoleStore], () => {
+        const member = GuildMemberStore.getMember(GUILD_ID, userId) as any;
+        if (!member) return null;
+        const role = rulesRoleId();
+        if (role) return member.roles?.includes(role) ?? false;
+        return member.pending === true ? false : null; // fallback: Discord's own rules screen
+    });
+}
+
 export function CreatorInfo({ channelId, creatorId }: { channelId: string; creatorId: string; }) {
+    const rules = useRulesAccepted(creatorId);
     const texts = useStateFromStores([MessageStore], () =>
         ((MessageStore.getMessages(channelId) as any)?._array as any[] ?? [])
             .filter(m => m.author?.id === creatorId).map(m => String(m.content ?? "")),
@@ -61,6 +86,16 @@ export function CreatorInfo({ channelId, creatorId }: { channelId: string; creat
 
     return (
         <div className={cl("info")}>
+            <span
+                className={cl("fact", rules === true ? "fact-good" : rules === false ? "fact-bad" : "fact-open")}
+                title={de() ? "Regeln akzeptiert = Rolle „maybe not hhaaattt stupid?“" : "Rules accepted = role “maybe not hhaaattt stupid?”"}
+            >
+                📜 {rules === true
+                    ? (de() ? "Regeln akzeptiert" : "rules accepted")
+                    : rules === false
+                        ? (de() ? "Regeln NICHT akzeptiert" : "rules NOT accepted")
+                        : (de() ? "Regeln: unbekannt" : "rules: unknown")}
+            </span>
             <span className={cl("fact", `fact-${ageLevel}`)} title={age ? `${de() ? "Gefunden" : "Found"}: ${age.source}` : undefined}>
                 🎂 {ageText ?? (de() ? "Alter fehlt" : "no age yet")}{birthday ? " 🎉" : ""}
             </span>

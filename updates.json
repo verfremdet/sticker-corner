@@ -1,6 +1,18 @@
 {
-    "version": "1.13.0",
+    "version": "1.13.1",
     "news": [
+        {
+            "version": "1.13.1",
+            "date": "2026-11-09",
+            "items": {
+                "en": [
+                    "Ticket profile: 📜 shows whether the person really accepted the rules (role “maybe not hhaaattt stupid?”) – green yes, red no, updates live"
+                ],
+                "de": [
+                    "Ticket-Steckbrief: 📜 zeigt, ob die Person die Regeln wirklich akzeptiert hat (Rolle „maybe not hhaaattt stupid?“) – grün ja, rot nein, aktualisiert sich live"
+                ]
+            }
+        },
         {
             "version": "1.13.0",
             "date": "2026-11-09",
