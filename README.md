@@ -42,7 +42,7 @@ Read the script before running it.
 irm https://raw.githubusercontent.com/verfremdet/sticker-corner/main/install.ps1 | iex
 ```
 
-or download this repository (**Code → Download ZIP**), extract it, right-click `install.ps1` → **Run with PowerShell**.
+or download this repository (**Code → Download ZIP**), extract it and double-click `install.cmd`.
 
 **macOS / Linux:**
 

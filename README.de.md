@@ -42,7 +42,7 @@ Lies das Skript, bevor du es ausführst.
 irm https://raw.githubusercontent.com/verfremdet/sticker-corner/main/install.ps1 | iex
 ```
 
-Oder dieses Repo herunterladen (**Code → Download ZIP**), entpacken, Rechtsklick auf `install.ps1` → **Mit PowerShell ausführen**.
+Oder dieses Repo herunterladen (**Code → Download ZIP**), entpacken und `install.cmd` doppelklicken.
 
 **macOS / Linux:**
 

@@ -1,7 +1,7 @@
-﻿# Sticker Corner – uninstaller for Windows
+# Sticker Corner – uninstaller for Windows
 # Restores normal Discord and deletes the Sticker Corner folder.
 # Source: https://github.com/verfremdet/sticker-corner
-# Keep this file UTF-8 WITH BOM.
+# Keep this file UTF-8 WITHOUT BOM ("irm | iex" would choke on a BOM). From the ZIP: uninstall.cmd
 
 $ErrorActionPreference = "Continue"
 $Root = Join-Path $env:LOCALAPPDATA "StickerCorner"

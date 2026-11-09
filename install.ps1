@@ -1,16 +1,18 @@
-﻿# Sticker Corner – installer for Windows
+# Sticker Corner – installer for Windows
 # Builds Vencord with the Sticker Corner plugin and installs it into Discord.
 # Run it again to update.
 # Source and explanation: https://github.com/verfremdet/sticker-corner
 # Downloads only from: github.com (Vencord + this plugin), winget (Microsoft), npm (pnpm).
-# Keep this file UTF-8 WITH BOM (Windows PowerShell 5.1 reads it as ANSI otherwise).
+# Keep this file UTF-8 WITHOUT BOM: "irm | iex" would choke on a BOM.
+# From the ZIP, start install.cmd – it reads this file explicitly as UTF-8.
 
 # Not "Stop": Windows PowerShell 5.1 would treat normal stderr output of git/pnpm as errors.
 $ErrorActionPreference = "Continue"
 $Repo = "https://github.com/verfremdet/sticker-corner"
 $Root = Join-Path $env:LOCALAPPDATA "StickerCorner"
 $Vencord = Join-Path $Root "Vencord"
-$ScriptDir = $PSScriptRoot
+# Folder with plugin\stickerCorner when started from the ZIP (install.cmd sets STICKERCORNER_DIR)
+$ScriptDir = if ($PSScriptRoot) { $PSScriptRoot } else { $env:STICKERCORNER_DIR }
 
 # English by default, German on German Windows
 $De = (Get-UICulture).TwoLetterISOLanguageName -eq "de"
