@@ -9,12 +9,14 @@ import "./style.css";
 
 import ErrorBoundary from "@components/ErrorBoundary";
 import definePlugin from "@utils/types";
-import { Channel } from "@vencord/discord-types";
-import { ExpressionPickerStore } from "@webpack/common";
+import { Channel, Message } from "@vencord/discord-types";
+import { ChannelStore, ExpressionPickerStore } from "@webpack/common";
 import type { ComponentType, ReactNode } from "react";
 
 import { StickerCornerChatButton, StickerCornerIcon, VIEW } from "./chatButton";
 import { imageContextMenuPatch, messageContextMenuPatch } from "./contextMenu";
+import { t } from "./i18n";
+import { canReplyIn, replyWithSticker } from "./reply";
 import { settings } from "./settings";
 import { cl, StickerCornerPanel } from "./StickerCorner";
 import { start, stop } from "./store";
@@ -38,6 +40,21 @@ export default definePlugin({
     chatBarButton: {
         icon: StickerCornerIcon,
         render: StickerCornerChatButton,
+    },
+
+    // "Reply with a sticker" in the hover bar of every message
+    messagePopoverButton: {
+        icon: StickerCornerIcon,
+        render(msg: Message) {
+            if (!canReplyIn(ChannelStore.getChannel(msg.channel_id))) return null;
+            return {
+                label: t("replyWithSticker"),
+                icon: StickerCornerIcon,
+                message: msg,
+                channel: ChannelStore.getChannel(msg.channel_id),
+                onClick: () => replyWithSticker(msg),
+            };
+        },
     },
 
     contextMenus: {

@@ -97,6 +97,7 @@ export async function refresh() {
 export async function start() {
     recent = await DataStore.get<string[]>(RECENT_KEY) ?? [];
     favorites = await DataStore.get<string[]>(FAV_KEY) ?? [];
+    counts = await DataStore.get<Record<string, number>>(COUNT_KEY) ?? {};
     refresh();
     timer = setInterval(refresh, POLL_MS);
 }
@@ -131,9 +132,25 @@ export function useStickers() {
     };
 }
 
+// personal stats: how often I sent each sticker (local only)
+const COUNT_KEY = "StickerCorner_counts";
+let counts: Record<string, number> = {};
+export const myCount = (id: string) => counts[id] ?? 0;
+/** my most sent sticker (sent at least twice) */
+export function myTop(): { sticker: Sticker; n: number; } | null {
+    let best: { sticker: Sticker; n: number; } | null = null;
+    for (const st of stickers) {
+        const n = counts[st.id] ?? 0;
+        if (n >= 2 && (!best || n > best.n)) best = { sticker: st, n };
+    }
+    return best;
+}
+
 function remember(id: string) {
     recent = [id, ...recent.filter(r => r !== id)].slice(0, RECENT_MAX);
     DataStore.set(RECENT_KEY, recent);
+    counts = { ...counts, [id]: (counts[id] ?? 0) + 1 };
+    DataStore.set(COUNT_KEY, counts);
     emit();
 }
 
@@ -207,6 +224,28 @@ async function stickerFile(s: Sticker): Promise<File> {
     const blob = await loadBlob(fileName);
     return new File([blob], `${safeFileName(s.name)}.${fileName.split(".").pop()}`, { type: blob.type });
 }
+
+/** Sends any file through Discord's own send path (shows up instantly, Discord uploads it) */
+export function sendFileNow(file: File, channelId: string): boolean {
+    const reply = PendingReplyStore.getPendingReply(channelId);
+    if (reply) FluxDispatcher.dispatch({ type: "DELETE_PENDING_REPLY", channelId });
+    const messageReference = reply ? MessageActions.getSendMessageOptionsForReply(reply)?.messageReference : undefined;
+    const upload = new CloudUpload({ file, isThumbnail: false, platform: CloudUploadPlatform.WEB }, channelId);
+    try {
+        MessageActions.sendMessage(
+            channelId,
+            { content: "", tts: false, invalidEmojis: [], validNonShortcutEmojis: [] } as any,
+            true,
+            { attachmentsToUpload: [upload], ...(messageReference ? { messageReference } : {}) } as any,
+        );
+        return true;
+    } catch {
+        uploadFile(file, channelId, "");
+        return true;
+    }
+}
+
+export const fileUrlOf = (s: Sticker) => fileUrl(s);
 
 /** Load the small images in the background (picker open) so a click never waits for our server */
 export function warmBlobs(list: Sticker[]) {

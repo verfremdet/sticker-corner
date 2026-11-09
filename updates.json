@@ -1,6 +1,24 @@
 {
-    "version": "1.7.0",
+    "version": "1.8.0",
     "news": [
+        {
+            "version": "1.8.0",
+            "date": "2026-11-09",
+            "items": {
+                "en": [
+                    "🎰 Sticker Slots: pull the lever, win a random sticker – three of a kind is a JACKPOT",
+                    "Aa on a sticker: put meme text on it and send",
+                    "Reply with a sticker: new button in the hover bar of every message",
+                    "Your #1 sticker at the bottom, and how often you sent each one"
+                ],
+                "de": [
+                    "🎰 Sticker-Slots: Hebel ziehen, zufälligen Sticker gewinnen – drei gleiche sind JACKPOT",
+                    "Aa am Sticker: Meme-Text drauf und senden",
+                    "Mit Sticker antworten: neuer Knopf an jeder Nachricht",
+                    "Deine Nr. 1 unten im Reiter und wie oft du jeden Sticker gesendet hast"
+                ]
+            }
+        },
         {
             "version": "1.7.0",
             "date": "2026-11-09",

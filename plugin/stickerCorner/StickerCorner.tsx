@@ -9,7 +9,9 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "@webpack/
 import { CategoryChip, categoriesOf, chipsFor } from "./categories";
 import { t } from "./i18n";
 import { openRenameModal } from "./contextMenu";
-import { canPost, prepareSticker, sendSticker, smallUrl, Sticker, toggleFavorite, useStickers, warmBlobs } from "./store";
+import { openMemeModal } from "./memeText";
+import { SlotMachine } from "./slots";
+import { canPost, myCount, myTop, prepareSticker, sendSticker, smallUrl, Sticker, toggleFavorite, useStickers, warmBlobs } from "./store";
 import { dismissWhatsNew, itemsOf, restartDiscord, runUpdate, useUpdate, useWhatsNew } from "./updater";
 import { VERSION } from "./version";
 
@@ -48,6 +50,7 @@ interface TileHandlers {
     isFavorite(id: string): boolean;
     /** may rename (= may post in the sticker channel) */
     canEdit: boolean;
+    onMeme(s: Sticker): void;
 }
 
 function PencilIcon() {
@@ -58,7 +61,7 @@ function PencilIcon() {
     );
 }
 
-function Tile({ sticker, onSend, onHover, isFavorite, canEdit }: TileHandlers & { sticker: Sticker; }) {
+function Tile({ sticker, onSend, onHover, isFavorite, canEdit, onMeme }: TileHandlers & { sticker: Sticker; }) {
     const fav = isFavorite(sticker.id);
     const label = sticker.name || "Sticker";
     return (
@@ -73,6 +76,14 @@ function Tile({ sticker, onSend, onHover, isFavorite, canEdit }: TileHandlers & 
                 <img src={smallUrl(sticker)} alt={label} loading="lazy" draggable={false} />
             </button>
             <div className={cl("actions")}>
+                <button
+                    className={cl("action", "meme")}
+                    onClick={() => onMeme(sticker)}
+                    aria-label={t("memeOpen")}
+                    title={t("memeOpen")}
+                >
+                    Aa
+                </button>
                 {canEdit && sticker.messageId && (
                     <button
                         className={cl("action", "edit")}
@@ -251,7 +262,10 @@ export function StickerCornerPanel({ channel, close }: Props) {
     }, [loaded, stickers.length > 0, channel.id]);
 
     const canEdit = useMemo(() => canPost(), [stickers]);
-    const handlers: TileHandlers = { onSend, onHover, isFavorite, canEdit };
+    const onMeme = (s: Sticker) => { openMemeModal(s, channel.id); close(); };
+    const handlers: TileHandlers = { onSend, onHover, isFavorite, canEdit, onMeme };
+    const [slotOpen, setSlotOpen] = useState(false);
+    const top = myTop();
 
     // Always open at the top (favorites first). Favorites/recent load a moment later and
     // land above "All" – keep pinning to the top until the user scrolls themselves.
@@ -334,6 +348,7 @@ export function StickerCornerPanel({ channel, close }: Props) {
                         spellCheck={false}
                     />
                 </label>
+                <button className={cl("slot-open")} onClick={() => setSlotOpen(true)} title={t("slotOpen")} aria-label={t("slotOpen")}>🎰</button>
             </div>
             <CategoryChips chips={chips} active={activeCategory} onPick={setCategory} />
             <div
@@ -353,13 +368,32 @@ export function StickerCornerPanel({ channel, close }: Props) {
                         <img className={cl("footer-img")} src={smallUrl(hovered)} alt="" />
                         <div className={cl("footer-text")}>
                             <div className={cl("footer-name")}>{hovered.name || "Sticker"}</div>
-                            {hovered.author && <div className={cl("footer-author")}>{t("by", { name: hovered.author })}</div>}
+                            <div className={cl("footer-author")}>
+                                {[hovered.author && t("by", { name: hovered.author }), myCount(hovered.id) > 0 && t("sentByYou", { n: myCount(hovered.id) })].filter(Boolean).join(" · ")}
+                            </div>
                         </div>
                     </>
                 ) : (
-                    <div className={cl("footer-brand")}>,, Sticker Corner ,,</div>
+                    <>
+                        <div className={cl("footer-brand")}>,, Sticker Corner ,,</div>
+                        {top && (
+                            <div className={cl("footer-top")} title={top.sticker.name}>
+                                <img src={smallUrl(top.sticker)} alt="" />
+                                {t("yourFavorite", { name: top.sticker.name || "Sticker", n: top.n })}
+                            </div>
+                        )}
+                    </>
                 )}
             </div>
+            {slotOpen && (
+                <SlotMachine
+                    stickers={stickers}
+                    favorites={favorites}
+                    channelId={channel.id}
+                    onSend={s => { sendSticker(s, channel.id); setSlotOpen(false); close(); }}
+                    onClose={() => setSlotOpen(false)}
+                />
+            )}
         </div>
     );
 }
