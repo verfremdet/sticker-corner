@@ -1,6 +1,20 @@
 {
-    "version": "1.2.0",
+    "version": "1.2.1",
     "news": [
+        {
+            "version": "1.2.1",
+            "date": "2026-11-09",
+            "items": {
+                "en": [
+                    "Sticker name at the bottom is readable again (was black on dark)",
+                    "Name a sticker: reply to its image in the channel – the newest reply wins"
+                ],
+                "de": [
+                    "Sticker-Name unten ist wieder lesbar (war schwarz auf dunkel)",
+                    "Sticker benennen: im Channel auf das Bild antworten – die neueste Antwort gilt"
+                ]
+            }
+        },
         {
             "version": "1.2.0",
             "date": "2026-11-09",
