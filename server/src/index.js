@@ -70,6 +70,8 @@ const client = new Client({
 const isOurChannel = msg => msg.channelId === CHANNEL_ID;
 
 async function addMessage(message) {
+    // Bot messages (e.g. the pinned how-to with screenshot) are never stickers
+    if (message.author?.bot) return;
     for (const attachment of message.attachments.values()) {
         if (!mediaExt(attachment)) continue;
         try {
@@ -91,7 +93,7 @@ async function fullSync() {
         const batch = await channel.messages.fetch({ limit: 100, before });
         if (batch.size === 0) break;
         for (const message of batch.values()) {
-            for (const a of message.attachments.values()) if (mediaExt(a)) seen.add(a.id);
+            if (!message.author?.bot) for (const a of message.attachments.values()) if (mediaExt(a)) seen.add(a.id);
             await addMessage(message);
         }
         before = batch.last().id;
