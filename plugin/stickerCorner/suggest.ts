@@ -142,6 +142,43 @@ function save() {
     }, 1500);
 }
 
+// ── recognize stickers and GIFs in the chat (for "auto counter") ───────
+export const safeFileName = (name: string) => name.replace(/[^\p{L}\p{N} _-]/gu, "").trim().replace(/\s+/g, "_").slice(0, 40) || "sticker";
+const DISCORD_FILE_RE = /^https:\/\/(?:cdn|media)\.discordapp\.(?:com|net)\/attachments\//;
+let byFileName = new Map<string, Sticker>();
+let alias: Record<string, string> = {}; // lobby GIF link → sticker id (from the server)
+
+/** store.ts calls this whenever the sticker list changes */
+export function setStickerList(list: Sticker[]) {
+    byFileName = new Map(list.filter(s => s.name).map(s => [safeFileName(s.name).toLowerCase(), s]));
+}
+
+/** Which sticker/GIF does this message send? Sticker Corner images are recognized by their file name. */
+function itemOfMessage(m: any): { key: ItemKey; words: string; } | null {
+    const content = String(m.content ?? "").trim();
+    if (GIF_HOST_RE.test(content) && !/\s/.test(content)) {
+        const url = DISCORD_FILE_RE.test(content) ? content.split("?")[0] : content;
+        return { key: alias[url] ? `s:${alias[url]}` : `g:${url}`, words: gifWords(url) };
+    }
+    for (const a of m.attachments ?? []) {
+        const base = String(a.filename ?? "").replace(/\.[^.]+$/, "").toLowerCase();
+        const s = byFileName.get(base);
+        if (s) return { key: `s:${s.id}`, words: s.name };
+        if (/\.gif$/i.test(a.filename ?? "") || /^image\/gif|^video\//.test(a.content_type ?? "")) {
+            const url = String(a.url ?? "").split("?")[0];
+            return { key: alias[url] ? `s:${alias[url]}` : `g:${url}`, words: "" };
+        }
+    }
+    return null;
+}
+
+/** Newest message is a sticker/GIF from someone else → the bar shows "counter" */
+export function isCounterMoment(channelId: string): boolean {
+    const all = ((MessageStore.getMessages(channelId) as any)?._array as any[] ?? []);
+    const m = all[all.length - 1];
+    return !!m && m.author?.id !== UserStore.getCurrentUser()?.id && !m.author?.bot && !!itemOfMessage(m);
+}
+
 /** What was said before: up to 6 messages of the last 15 min, newest weighs most */
 export function contextOf(channelId: string, beforeId?: string): Record<string, number> {
     const all = ((MessageStore.getMessages(channelId) as any)?._array as any[] ?? []);
@@ -155,10 +192,18 @@ export function contextOf(channelId: string, beforeId?: string): Record<string, 
         if (m.author?.bot) continue;
         const ts = new Date(m.timestamp).getTime();
         if (now - ts > 15 * 60_000 && n > 0) break;
-        const text = String(m.content ?? "") + " " + (m.embeds ?? []).map((e: any) => e.url ?? "").map(gifWords).join(" ");
-        if (!text.trim()) continue;
         // my own words count a bit less than what the others said
-        tokenize(text, [1, 0.75, 0.55, 0.4, 0.3, 0.22][n] * (m.author?.id === me ? 0.7 : 1), vec);
+        const w = [1, 0.75, 0.55, 0.4, 0.3, 0.22][n] * (m.author?.id === me ? 0.7 : 1);
+        const item = itemOfMessage(m);
+        let text = String(m.content ?? "") + " " + (m.embeds ?? []).map((e: any) => e.url ?? "").map(gifWords).join(" ");
+        if (item) {
+            // somebody sent a sticker/GIF → what do people answer to exactly that one?
+            const k = `r:${item.key}`;
+            vec[k] = (vec[k] ?? 0) + (n === 0 ? 2.5 : 0.8) * w;
+            text += " " + item.words;
+        }
+        if (!text.trim() && !item) continue;
+        tokenize(text, w, vec);
         n++;
     }
     return vec;
@@ -221,6 +266,7 @@ function useBrain(data: any) {
         e.norm = Math.sqrt(n);
     }
     shared = list;
+    alias = data?.alias && typeof data.alias === "object" ? data.alias : {};
     sharedGifs = {};
     for (const [url, g] of Object.entries<any>(data?.gifs ?? {})) sharedGifs[url] = { url, src: g.src ?? url, video: !!g.video, width: g.width ?? 0, height: g.height ?? 0 };
 }

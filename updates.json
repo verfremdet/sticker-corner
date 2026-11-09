@@ -1,6 +1,20 @@
 {
-    "version": "1.12.2",
+    "version": "1.13.0",
     "news": [
+        {
+            "version": "1.13.0",
+            "date": "2026-11-09",
+            "items": {
+                "en": [
+                    "⚔️ Auto counter: someone sends a sticker or GIF → the bar suggests what people answer to exactly that one (learned from the lobbies)",
+                    "🎱 Ticket Bingo for the team: 16 typical ticket moments tick themselves (Disboard is always on it), full row = BINGO"
+                ],
+                "de": [
+                    "⚔️ Auto-Konter: Jemand schickt einen Sticker oder ein GIF → die Leiste schlägt vor, womit Leute genau darauf antworten (aus den Lobbys gelernt)",
+                    "🎱 Ticket-Bingo fürs Team: 16 typische Ticket-Momente haken sich selbst ab (Disboard ist immer drauf), volle Reihe = BINGO"
+                ]
+            }
+        },
         {
             "version": "1.12.2",
             "date": "2026-11-09",

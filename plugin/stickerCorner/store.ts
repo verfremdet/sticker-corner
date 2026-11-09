@@ -11,7 +11,7 @@ import { ChannelStore, Constants, FluxDispatcher, MessageActions, PendingReplySt
 
 import { t } from "./i18n";
 import { settings } from "./settings";
-import { learn } from "./suggest";
+import { learn, safeFileName, setStickerList } from "./suggest";
 
 export interface Sticker {
     id: string;
@@ -89,6 +89,7 @@ export async function refresh() {
                     sendFile: typeof s.sendFile === "string" && SEND_FILE_RE.test(s.sendFile) ? s.sendFile : undefined,
                 };
             });
+        setStickerList(stickers);
         loaded = true;
         failed = false;
         if (changed) emit();
@@ -381,7 +382,6 @@ export async function sendSticker(sticker: Sticker, channelId: string): Promise<
     return true;
 }
 
-const safeFileName = (name: string) => name.replace(/[^\p{L}\p{N} _-]/gu, "").trim().replace(/\s+/g, "_").slice(0, 40) || "sticker";
 
 /** Counts the send on the server for "Popular" (anonymous, best effort) */
 function reportUse(id: string) {

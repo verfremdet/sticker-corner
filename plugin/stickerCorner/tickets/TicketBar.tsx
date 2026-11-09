@@ -13,6 +13,7 @@ import { lang } from "../i18n";
 import { findSticker, prepareSticker, sendSticker } from "../store";
 import { play, preloadSounds } from "../sounds";
 import { GATEKEEPERS, GREET_STICKER_RE, GREET_TEXT, GUILD_ID, VISIBLE_SUGGESTIONS } from "./config";
+import { BingoBoard, useBingo } from "./bingo";
 import { Confetti, CreatorInfo, useMoment, VibeDice } from "./extras";
 import { chatFor, creatorOf, isApproved, isChatOpen, isTeamMember, loadVotes, markSeen, sendChat, setChatOpen, setText, subscribe, suggestions, Tally, tallyFor, toggleVote, unreadFor, voteChannel, VoteKind } from "./store";
 
@@ -234,6 +235,8 @@ export function TicketBar({ channel }: { channel: Channel; }) {
     const approved = isApproved(tally);
     const hasVoteChannel = !!voteChannel();
     const [busy, setBusy] = useState(false);
+    const bingo = useBingo(channel.id, creatorId);
+    const [bingoOpen, setBingoOpen] = useState(false);
 
     const vote = async (kind: VoteKind) => {
         if (busy) return;
@@ -328,12 +331,21 @@ export function TicketBar({ channel }: { channel: Channel; }) {
                         {!chatOpen && unread > 0 && <span className={cl("badge")}>{unread}</span>}
                     </button>
                 )}
+                <button
+                    className={cl("chat-toggle", bingoOpen && "chat-toggle-open", bingo.lines.length > 0 && "bingo-toggle-won")}
+                    onClick={() => setBingoOpen(!bingoOpen)}
+                    title="Ticket Bingo"
+                >
+                    🎱 {bingo.lines.length > 0 ? "BINGO" : `${bingo.count}/16`}
+                </button>
                 <button className={cl("ban")} onClick={ban} disabled={!creatorId}>{tt("ban")}</button>
             </div>
 
             {creatorId && <CreatorInfo channelId={channel.id} creatorId={creatorId} />}
 
             {hasVoteChannel && chatOpen && <TeamChat ticketId={channel.id} />}
+
+            {bingoOpen && <BingoBoard bingo={bingo} />}
 
             {approved && <div className={cl("approved", celebrating && "approved-pop")}>{tt("approved")}</div>}
 

@@ -12,7 +12,7 @@ import { lang, t } from "./i18n";
 import { settings } from "./settings";
 import { cl } from "./StickerCorner";
 import { myCount, prepareSticker, sendSticker, smallUrl, useStickers } from "./store";
-import { favoriteGifs, Suggestion, suggest } from "./suggest";
+import { favoriteGifs, isCounterMoment, Suggestion, suggest } from "./suggest";
 import { sendMessage } from "@utils/discord";
 
 const KEY = "StickerCorner_fitsBar";
@@ -52,6 +52,7 @@ export function FitsBar({ channel }: { channel: Channel; }) {
     const bar = useBarState();
     const { stickers, loaded } = useStickers();
     const [fits, setFits] = useState<Suggestion[]>([]);
+    const [counter, setCounter] = useState(false);
     const [tick, setTick] = useState(0);
     const [peek, setPeek] = useState<{ f: Suggestion; x: number; } | null>(null);
     const barRef = useRef<HTMLDivElement>(null);
@@ -71,6 +72,7 @@ export function FitsBar({ channel }: { channel: Channel; }) {
     useEffect(() => {
         if (!loaded || !stickers.length) return;
         setFits(suggest(channel.id, stickers, favoriteGifs(), myCount, 10));
+        setCounter(isCounterMoment(channel.id));
     }, [loaded, stickers.length, channel.id, tick]);
 
     // drag the top edge: up = bigger, down = smaller
@@ -108,7 +110,8 @@ export function FitsBar({ channel }: { channel: Channel; }) {
             )}
             <div className={cl("fb-head")}>
                 <button className={cl("fb-title")} onClick={() => update({ collapsed: !bar.collapsed })}>
-                    <span className={cl("fb-arrow")}>{bar.collapsed ? "▸" : "▾"}</span> {t("fitsNow")}
+                    <span className={cl("fb-arrow")}>{bar.collapsed ? "▸" : "▾"}</span>
+                    {counter ? <span className={cl("fb-counter")}>⚔️ {de() ? "Konter!" : "Counter!"}</span> : t("fitsNow")}
                     {bar.collapsed && <span className={cl("fb-count")}>{fits.length}</span>}
                 </button>
                 <button

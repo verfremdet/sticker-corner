@@ -98,17 +98,26 @@ export class Brain {
             const p = list[j];
             if (p.author?.bot) continue;
             if (at - p.createdTimestamp > WINDOW_MS && n > 0) break;
-            if (this.itemOf(p)) continue; // a GIF before is no context
-            const text = textOf(p);
-            if (!text.trim()) continue;
-            tokenize(text, WEIGHTS[n] * (p.author?.id === m.author?.id ? 0.7 : 1), vec);
+            const w = WEIGHTS[n] * (p.author?.id === m.author?.id ? 0.7 : 1);
+            // a GIF/sticker before → "r:<key>": learns which GIF people answer with (auto counter)
+            const prev = this.itemOf(p);
+            let text = textOf(p);
+            if (prev) {
+                const k = `r:${this.keyOf(prev.key)}`;
+                vec[k] = (vec[k] ?? 0) + (n === 0 ? 2.5 : 0.8) * w;
+                if (prev.key.startsWith("s:")) text += " " + (this.store.stickers.get(prev.key.slice(2))?.name ?? "");
+            }
+            if (!text.trim() && !prev) continue;
+            tokenize(text, w, vec);
             n++;
         }
         // answered directly → that message counts strongly
         const refId = m.reference?.messageId;
         if (refId) {
             const ref = list.find(p => p.id === refId);
-            if (ref && !this.itemOf(ref)) tokenize(textOf(ref), 0.8, vec);
+            const prev = ref && this.itemOf(ref);
+            if (prev) { const k = `r:${this.keyOf(prev.key)}`; vec[k] = (vec[k] ?? 0) + 2.5; }
+            else if (ref) tokenize(textOf(ref), 0.8, vec);
         }
         if (!Object.keys(vec).length) return null;
         const v = {};
@@ -208,8 +217,12 @@ export class Brain {
             if (DISCORD_FILE_RE.test(it.url)) continue;     // file links expire – only usable once stolen
             gifs[it.url] = { src: it.src, video: it.video, width: it.width, height: it.height };
         }
+        // lobby GIF link → the sticker it became (so the plugin can recognize it in the chat)
+        const alias = {};
+        for (const [k, id] of Object.entries(this.stolen)) if (k.startsWith("g:") && this.store.stickers.has(id)) alias[k.slice(2)] = id;
         return {
             version: this.version,
+            alias,
             examples: this.examples.map(({ k, at, u, v }) => ({ k: this.keyOf(k), at, u, v })),
             gifs,
         };
