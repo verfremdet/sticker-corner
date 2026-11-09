@@ -8,7 +8,8 @@ import { useMemo, useState } from "@webpack/common";
 
 import { t } from "./i18n";
 import { sendSticker, smallUrl, Sticker, toggleFavorite, useStickers } from "./store";
-import { itemsOf, restartDiscord, runUpdate, useUpdate } from "./updater";
+import { dismissWhatsNew, itemsOf, restartDiscord, runUpdate, useUpdate, useWhatsNew } from "./updater";
+import { VERSION } from "./version";
 
 export const cl = classNameFactory("vc-sc-");
 
@@ -83,10 +84,25 @@ function Section({ title, stickers, ...handlers }: TileHandlers & { title: strin
     );
 }
 
+function WhatsNewBanner() {
+    const { show, items } = useWhatsNew();
+    if (!show) return null;
+    return (
+        <div className={cl("update")}>
+            <div className={cl("update-row")}>
+                <b>{t("newIn", { v: VERSION })}</b>
+                <button className={cl("update-btn")} onClick={dismissWhatsNew}>OK</button>
+            </div>
+            <ul className={cl("update-news")}>
+                {items.map((item, i) => <li key={i}>{item}</li>)}
+            </ul>
+        </div>
+    );
+}
+
 function UpdateBanner() {
     const { available, latest, status, error, news } = useUpdate();
-    const [open, setOpen] = useState(false);
-    if (!available && status === "idle") return null;
+    if (!available && status === "idle") return <WhatsNewBanner />;
 
     let action: React.ReactNode;
     if (status === "updating") action = <span className={cl("update-busy")}>{t("updating")}</span>;
@@ -96,22 +112,16 @@ function UpdateBanner() {
     return (
         <div className={cl("update")}>
             <div className={cl("update-row")}>
-                <div className={cl("update-text")}>
-                    <b>{status === "done" ? t("updateInstalled") : t("updateAvailable", { v: latest ?? "" })}</b>
-                    {news.length > 0 && status !== "done" && (
-                        <button className={cl("update-link")} onClick={() => setOpen(o => !o)}>
-                            {open ? t("less") : t("whatsNew")}
-                        </button>
-                    )}
-                </div>
+                <b>{status === "done" ? t("updateInstalled") : t("updateAvailable", { v: latest ?? "" })}</b>
                 {action}
             </div>
             {status === "error" && <div className={cl("update-error")}>{error}</div>}
-            {open && (
+            {status !== "done" && news.length > 0 && (
                 <ul className={cl("update-news")}>
                     {news.flatMap(n => itemsOf(n).map((item, i) => <li key={n.version + i}>{item}</li>))}
                 </ul>
             )}
+            {status === "done" && <div className={cl("update-hint")}>{t("restartHint")}</div>}
         </div>
     );
 }

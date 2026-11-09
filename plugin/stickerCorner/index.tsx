@@ -13,13 +13,12 @@ import { Channel } from "@vencord/discord-types";
 import { ExpressionPickerStore } from "@webpack/common";
 import type { ComponentType, ReactNode } from "react";
 
+import { StickerCornerChatButton, StickerCornerIcon, VIEW } from "./chatButton";
 import { settings } from "./settings";
 import { cl, StickerCornerPanel } from "./StickerCorner";
 import { start, stop } from "./store";
 import { startUpdater, stopUpdater } from "./updater";
 import { VERSION } from "./version";
-
-const VIEW = "stickercorner";
 
 interface PanelArgs {
     activeView: string;
@@ -32,6 +31,11 @@ export default definePlugin({
     description: `Adds a “Sticker Corner” tab to the sticker picker: images from the sticker channel, sent with one click. Version ${VERSION}`,
     authors: [{ name: "verfremdet", id: 0n }],
     settings,
+
+    chatBarButton: {
+        icon: StickerCornerIcon,
+        render: StickerCornerChatButton,
+    },
 
     patches: [
         {

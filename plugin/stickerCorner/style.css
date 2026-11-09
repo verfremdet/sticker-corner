@@ -334,3 +334,19 @@
     transform: scale(1);
     color: #f0b232;
 }
+
+.vc-sc-update-hint {
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+/* Chat bar button: same size and color behavior as Discord's own buttons */
+.vc-sc-chatbutton {
+    display: block;
+    transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+*:hover > .vc-sc-chatbutton {
+    transform: scale(1.14) rotate(-6deg);
+}

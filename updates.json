@@ -1,6 +1,22 @@
 {
-    "version": "1.1.0",
+    "version": "1.2.0",
     "news": [
+        {
+            "version": "1.2.0",
+            "date": "2026-11-09",
+            "items": {
+                "en": [
+                    "New button in the chat bar: opens Sticker Corner directly",
+                    "After an update you see what is new right in the tab",
+                    "Updates take effect on your next Discord restart – no forced restart"
+                ],
+                "de": [
+                    "Neuer Knopf in der Chat-Leiste: öffnet Sticker Corner direkt",
+                    "Nach einem Update siehst du direkt im Reiter, was neu ist",
+                    "Updates wirken beim nächsten Discord-Neustart – kein Zwangs-Neustart"
+                ]
+            }
+        },
         {
             "version": "1.1.0",
             "date": "2026-11-09",

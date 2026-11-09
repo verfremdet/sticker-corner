@@ -73,9 +73,33 @@ async function check() {
     } catch { /* offline – nächster Versuch später */ }
 }
 
+// "What's new" after an update: shown once per installed version, until OK is clicked
+const SEEN_KEY = "StickerCorner_seenVersion";
+let seenVersion: string | null = VERSION; // until loaded: show nothing
+
 export function startUpdater() {
+    DataStore.get<string>(SEEN_KEY).then(v => { seenVersion = v ?? null; emit(); });
     setTimeout(check, 5_000);
     timer = setInterval(check, CHECK_MS);
+}
+
+export function dismissWhatsNew() {
+    seenVersion = VERSION;
+    DataStore.set(SEEN_KEY, VERSION);
+    emit();
+}
+
+/** News for the installed version, if not yet confirmed */
+export function useWhatsNew() {
+    const [, force] = useState(0);
+    useEffect(() => {
+        const l = () => force(n => n + 1);
+        listeners.add(l);
+        return () => void listeners.delete(l);
+    }, []);
+    const entry = news.find(n => n.version === VERSION);
+    const show = seenVersion !== VERSION && entry != null;
+    return { show, items: entry ? itemsOf(entry) : [] };
 }
 
 export function stopUpdater() {
