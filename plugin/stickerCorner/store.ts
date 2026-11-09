@@ -1,5 +1,5 @@
 /*
- * Sticker Corner – Liste vom Server holen, zuletzt benutzte merken, Bild senden.
+ * Sticker Corner – loads the list from the server, remembers favorites and recently used, sends images.
  */
 
 import * as DataStore from "@api/DataStore";
@@ -15,6 +15,8 @@ export interface Sticker {
     id: string;
     name: string;
     file: string;
+    /** small send version (max. 224 px); missing on old servers */
+    sendFile?: string;
     width: number;
     height: number;
     author: string;
@@ -24,12 +26,17 @@ export interface Sticker {
 const CloudUpload: typeof TCloudUpload = findLazy(m => m.prototype?.trackUploadFinished);
 
 const RECENT_KEY = "StickerCorner_recent";
+const FAV_KEY = "StickerCorner_favorites";
 const RECENT_MAX = 12;
 const POLL_MS = 30_000;
+
+const FILE_RE = /^\d+\.(png|jpg|gif|webp)$/;
+const SEND_FILE_RE = /^\d+\.s\.(png|jpg|gif|webp)$/;
 
 let stickers: Sticker[] = [];
 let version = 0;
 let recent: string[] = [];
+let favorites: string[] = [];
 let loaded = false;
 let failed = false;
 let timer: ReturnType<typeof setInterval> | undefined;
@@ -39,6 +46,11 @@ const emit = () => listeners.forEach(l => l());
 const baseUrl = () => settings.store.serverUrl.replace(/\/+$/, "");
 
 export const fileUrl = (s: Sticker) => `${baseUrl()}/files/${s.file}`;
+/** Small version for the grid and for sending; falls back to the original */
+export const smallUrl = (s: Sticker) => `${baseUrl()}/files/${s.sendFile ?? s.file}`;
+
+/** File names like "91c81a5a8b08…" or "image0" are not real names */
+const isJunkName = (n: string) => /^[0-9a-f]{12,}$/i.test(n) || /^(image|unknown|img|file)\s?\d*$/i.test(n);
 
 export async function refresh() {
     try {
@@ -47,21 +59,30 @@ export async function refresh() {
         const data = await res.json() as { version: number; stickers: Sticker[]; };
         const changed = data.version !== version || !loaded || failed;
         version = data.version;
-        // Nur saubere Einträge übernehmen: Dateiname muss "<Zahl>.<Bildformat>" sein
-        stickers = (Array.isArray(data.stickers) ? data.stickers : []).filter(s =>
-            typeof s?.id === "string" && typeof s.file === "string" && /^\d+\.(png|jpg|gif|webp)$/.test(s.file)
-        ).map(s => ({ ...s, name: String(s.name ?? "").slice(0, 60), author: String(s.author ?? "").slice(0, 40) }));
+        // Only take clean entries: file names must be "<number>.<image format>"
+        stickers = (Array.isArray(data.stickers) ? data.stickers : [])
+            .filter(s => typeof s?.id === "string" && typeof s.file === "string" && FILE_RE.test(s.file))
+            .map(s => {
+                const name = String(s.name ?? "").slice(0, 60);
+                return {
+                    ...s,
+                    name: isJunkName(name) ? "" : name,
+                    author: String(s.author ?? "").slice(0, 40),
+                    sendFile: typeof s.sendFile === "string" && SEND_FILE_RE.test(s.sendFile) ? s.sendFile : undefined,
+                };
+            });
         loaded = true;
         failed = false;
         if (changed) emit();
     } catch (e) {
-        console.warn("[StickerCorner] Liste nicht ladbar:", e);
+        console.warn("[StickerCorner] could not load list:", e);
         if (!failed) { failed = true; loaded = true; emit(); }
     }
 }
 
 export async function start() {
     recent = await DataStore.get<string[]>(RECENT_KEY) ?? [];
+    favorites = await DataStore.get<string[]>(FAV_KEY) ?? [];
     refresh();
     timer = setInterval(refresh, POLL_MS);
 }
@@ -76,13 +97,16 @@ export function useStickers() {
     useEffect(() => {
         const l = () => force(n => n + 1);
         listeners.add(l);
-        refresh(); // beim Öffnen sofort neu holen
+        refresh(); // fetch right away when the picker opens
         return () => void listeners.delete(l);
     }, []);
     const byId = new Map(stickers.map(s => [s.id, s]));
+    const pick = (ids: string[]) => ids.map(id => byId.get(id)).filter(Boolean) as Sticker[];
     return {
         stickers,
-        recent: recent.map(id => byId.get(id)).filter(Boolean) as Sticker[],
+        recent: pick(recent),
+        favorites: pick(favorites),
+        isFavorite: (id: string) => favorites.includes(id),
         loaded,
         failed,
     };
@@ -94,13 +118,23 @@ function remember(id: string) {
     emit();
 }
 
-/** Lädt das Bild und sendet es als normalen Bild-Upload in den Channel. */
+/** Favorite on/off – unlimited, newest first */
+export function toggleFavorite(id: string) {
+    favorites = favorites.includes(id) ? favorites.filter(f => f !== id) : [id, ...favorites];
+    DataStore.set(FAV_KEY, favorites);
+    emit();
+}
+
+/** Loads the image and sends it to the channel as a normal image upload. */
 export async function sendSticker(sticker: Sticker, channelId: string) {
     remember(sticker.id);
 
+    const original = settings.store.sendSize === "original";
+    const fileName = original ? sticker.file : sticker.sendFile ?? sticker.file;
+
     let blob: Blob;
     try {
-        const res = await fetch(fileUrl(sticker));
+        const res = await fetch(`${baseUrl()}/files/${fileName}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         blob = await res.blob();
     } catch {
@@ -108,7 +142,7 @@ export async function sendSticker(sticker: Sticker, channelId: string) {
         return;
     }
 
-    const ext = sticker.file.split(".").pop();
+    const ext = fileName.split(".").pop();
     const safeName = sticker.name.replace(/[^\p{L}\p{N} _-]/gu, "").trim().replace(/\s+/g, "_") || "sticker";
     const file = new File([blob], `${safeName}.${ext}`, { type: blob.type });
 

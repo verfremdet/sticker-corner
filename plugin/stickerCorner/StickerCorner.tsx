@@ -1,5 +1,5 @@
 /*
- * Sticker Corner – Ansicht im Auswahlfenster (Suche, Raster, Vorschau unten).
+ * Sticker Corner – view inside the picker (search, favorites, grid, preview at the bottom).
  */
 
 import { classNameFactory } from "@utils/css";
@@ -7,7 +7,7 @@ import { Channel } from "@vencord/discord-types";
 import { useMemo, useState } from "@webpack/common";
 
 import { t } from "./i18n";
-import { fileUrl, sendSticker, Sticker, useStickers } from "./store";
+import { sendSticker, smallUrl, Sticker, toggleFavorite, useStickers } from "./store";
 import { itemsOf, restartDiscord, runUpdate, useUpdate } from "./updater";
 
 export const cl = classNameFactory("vc-sc-");
@@ -25,29 +25,59 @@ function SearchIcon() {
     );
 }
 
-function Tile({ sticker, onSend, onHover }: { sticker: Sticker; onSend(e: React.MouseEvent): void; onHover(s: Sticker | null): void; }) {
+function StarIcon({ filled }: { filled: boolean; }) {
     return (
-        <button
-            className={cl("tile")}
-            onClick={onSend}
-            onMouseEnter={() => onHover(sticker)}
-            onFocus={() => onHover(sticker)}
-            aria-label={sticker.name}
-        >
-            <img src={fileUrl(sticker)} alt={sticker.name} loading="lazy" draggable={false} />
-        </button>
+        <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+            <path
+                fill={filled ? "currentColor" : "none"}
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinejoin="round"
+                d="M12 2.8l2.8 5.7 6.3.9-4.6 4.4 1.1 6.3L12 17.1l-5.6 3 1.1-6.3L2.9 9.4l6.3-.9L12 2.8z"
+            />
+        </svg>
     );
 }
 
-function Section({ title, stickers, ...rest }: { title: string; stickers: Sticker[]; onSend(s: Sticker, e: React.MouseEvent): void; onHover(s: Sticker | null): void; }) {
+interface TileHandlers {
+    onSend(s: Sticker, e: React.MouseEvent): void;
+    onHover(s: Sticker | null): void;
+    isFavorite(id: string): boolean;
+}
+
+function Tile({ sticker, onSend, onHover, isFavorite }: TileHandlers & { sticker: Sticker; }) {
+    const fav = isFavorite(sticker.id);
+    const label = sticker.name || "Sticker";
+    return (
+        <div className={cl("cell", fav && "cell-fav")} onMouseEnter={() => onHover(sticker)}>
+            <button
+                className={cl("tile")}
+                onClick={e => onSend(sticker, e)}
+                onContextMenu={e => { e.preventDefault(); toggleFavorite(sticker.id); }}
+                onFocus={() => onHover(sticker)}
+                aria-label={label}
+            >
+                <img src={smallUrl(sticker)} alt={label} loading="lazy" draggable={false} />
+            </button>
+            <button
+                className={cl("star")}
+                onClick={() => toggleFavorite(sticker.id)}
+                aria-label={fav ? t("removeFavorite") : t("addFavorite")}
+                title={fav ? t("removeFavorite") : t("addFavorite")}
+            >
+                <StarIcon filled={fav} />
+            </button>
+        </div>
+    );
+}
+
+function Section({ title, stickers, ...handlers }: TileHandlers & { title: string; stickers: Sticker[]; }) {
     if (!stickers.length) return null;
     return (
         <section className={cl("section")}>
             <h3 className={cl("section-title")}>{title}</h3>
             <div className={cl("grid")}>
-                {stickers.map(s => (
-                    <Tile key={s.id} sticker={s} onSend={e => rest.onSend(s, e)} onHover={rest.onHover} />
-                ))}
+                {stickers.map(s => <Tile key={s.id} sticker={s} {...handlers} />)}
             </div>
         </section>
     );
@@ -87,7 +117,7 @@ function UpdateBanner() {
 }
 
 export function StickerCornerPanel({ channel, close }: Props) {
-    const { stickers, recent, loaded, failed } = useStickers();
+    const { stickers, recent, favorites, isFavorite, loaded, failed } = useStickers();
     const [query, setQuery] = useState("");
     const [hovered, setHovered] = useState<Sticker | null>(null);
 
@@ -99,9 +129,11 @@ export function StickerCornerPanel({ channel, close }: Props) {
 
     const onSend = (s: Sticker, e: React.MouseEvent) => {
         sendSticker(s, channel.id);
-        // Mit Shift bleibt das Fenster offen, wie bei Discords Emojis
+        // Shift keeps the picker open, like Discord's emojis
         if (!e.shiftKey) close();
     };
+
+    const handlers: TileHandlers = { onSend, onHover: setHovered, isFavorite };
 
     let body: React.ReactNode;
     if (!loaded) {
@@ -115,8 +147,9 @@ export function StickerCornerPanel({ channel, close }: Props) {
     } else {
         body = (
             <>
-                {!q && <Section title={t("recent")} stickers={recent} onSend={onSend} onHover={setHovered} />}
-                <Section title={q ? t("results", { n: filtered.length }) : t("all", { n: stickers.length })} stickers={filtered} onSend={onSend} onHover={setHovered} />
+                {!q && <Section title={t("favorites", { n: favorites.length })} stickers={favorites} {...handlers} />}
+                {!q && <Section title={t("recent")} stickers={recent} {...handlers} />}
+                <Section title={q ? t("results", { n: filtered.length }) : t("all", { n: stickers.length })} stickers={filtered} {...handlers} />
             </>
         );
     }
@@ -142,9 +175,9 @@ export function StickerCornerPanel({ channel, close }: Props) {
             <div className={cl("footer")}>
                 {hovered ? (
                     <>
-                        <img className={cl("footer-img")} src={fileUrl(hovered)} alt="" />
+                        <img className={cl("footer-img")} src={smallUrl(hovered)} alt="" />
                         <div className={cl("footer-text")}>
-                            <div className={cl("footer-name")}>{hovered.name}</div>
+                            <div className={cl("footer-name")}>{hovered.name || "Sticker"}</div>
                             {hovered.author && <div className={cl("footer-author")}>{t("by", { name: hovered.author })}</div>}
                         </div>
                     </>

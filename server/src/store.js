@@ -18,6 +18,19 @@ const VIDEO_MAX_SECONDS = 15;
 const VIDEO_MAX_DOWNLOAD = 100 * 1024 * 1024;
 // Versuche von gut nach klein, bis das GIF unter MAX_BYTES liegt
 const GIF_STEPS = [[480, 15], [400, 12], [320, 10], [240, 8]];
+// Sende-Version: etwas größer als Discord-Sticker (160 px), damit sie im Chat nicht riesig ist
+const SEND_SIDE = 224;
+
+/** Kleine Sende-Version im selben Format (GIF/WebP bleiben animiert) */
+async function makeSmall(buf, ext) {
+    const animated = ext === "gif" || ext === "webp";
+    let img = sharp(buf, { animated }).resize(SEND_SIDE, SEND_SIDE, { fit: "inside", withoutEnlargement: true });
+    if (ext === "gif") img = img.gif({ effort: 7 });
+    else if (ext === "webp") img = img.webp({ quality: 90 });
+    else if (ext === "jpg") img = img.jpeg({ quality: 90 });
+    else img = img.png();
+    return img.toBuffer();
+}
 
 const EXT_BY_TYPE = {
     "image/png": "png",
@@ -142,15 +155,15 @@ export class Store {
         } catch { /* Maße von Discord reichen */ }
 
         const file = `${attachment.id}.${fileExt}`;
-        const tmp = path.join(this.filesDir, file + ".tmp");
-        await writeFile(tmp, buf);
-        await rename(tmp, path.join(this.filesDir, file));
+        await this.writeAtomic(file, buf);
+        const sendFile = await this.writeSmall(attachment.id, buf, fileExt);
 
         this.stickers.set(attachment.id, {
             id: attachment.id,
             messageId: message.id,
             name: stickerName(message, attachment),
             file,
+            sendFile,
             width,
             height,
             size: buf.length,
@@ -159,6 +172,40 @@ export class Store {
         });
         this.changed();
         return true;
+    }
+
+    async writeAtomic(file, buf) {
+        const tmp = path.join(this.filesDir, file + ".tmp");
+        await writeFile(tmp, buf);
+        await rename(tmp, path.join(this.filesDir, file));
+    }
+
+    /** Legt <id>.s.<ext> an; bei Fehler sendet das Plugin das Original */
+    async writeSmall(id, buf, ext) {
+        try {
+            const sendFile = `${id}.s.${ext}`;
+            await this.writeAtomic(sendFile, await makeSmall(buf, ext));
+            return sendFile;
+        } catch (e) {
+            console.error(`Kleine Version ${id}:`, e.message);
+            return undefined;
+        }
+    }
+
+    /** Für ältere Einträge die kleine Sende-Version nachträglich erzeugen */
+    async backfillSmall() {
+        let n = 0;
+        for (const s of this.stickers.values()) {
+            if (s.sendFile) continue;
+            const buf = await readFile(path.join(this.filesDir, s.file)).catch(() => null);
+            if (!buf) continue;
+            s.sendFile = await this.writeSmall(s.id, buf, s.file.split(".").pop());
+            if (s.sendFile) n++;
+        }
+        if (n) {
+            console.log(`Kleine Versionen nachgezogen: ${n}`);
+            this.changed();
+        }
     }
 
     updateName(messageId, message) {
@@ -179,6 +226,7 @@ export class Store {
         if (!s) return;
         this.stickers.delete(id);
         await rm(path.join(this.filesDir, s.file), { force: true });
+        if (s.sendFile) await rm(path.join(this.filesDir, s.sendFile), { force: true });
         this.changed();
     }
 

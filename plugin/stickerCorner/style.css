@@ -286,3 +286,51 @@
     font-size: 13px;
     line-height: 1.5;
 }
+
+/* Favorites */
+.vc-sc-cell {
+    position: relative;
+}
+
+.vc-sc-cell .vc-sc-tile {
+    width: 100%;
+}
+
+.vc-sc-star {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: rgb(0 0 0 / 60%);
+    color: #fff;
+    cursor: pointer;
+    opacity: 0;
+    transform: scale(0.7);
+    transition: opacity 0.15s ease, transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.15s;
+}
+
+.vc-sc-cell:hover .vc-sc-star,
+.vc-sc-star:focus-visible {
+    opacity: 1;
+    transform: scale(1);
+}
+
+.vc-sc-star:hover {
+    transform: scale(1.15);
+}
+
+.vc-sc-star:active {
+    transform: scale(0.85);
+}
+
+.vc-sc-cell-fav .vc-sc-star {
+    opacity: 1;
+    transform: scale(1);
+    color: #f0b232;
+}

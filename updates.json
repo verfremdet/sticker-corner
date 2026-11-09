@@ -1,6 +1,22 @@
 {
-    "version": "1.0.0",
+    "version": "1.1.0",
     "news": [
+        {
+            "version": "1.1.0",
+            "date": "2026-11-09",
+            "items": {
+                "en": [
+                    "Favorites: click the star (or right-click a sticker), as many as you like",
+                    "Stickers are sent at sticker size (max. 224 px) instead of full size – switch in the settings",
+                    "Short videos from the channel become GIFs"
+                ],
+                "de": [
+                    "Favoriten: Stern anklicken (oder Rechtsklick auf einen Sticker), so viele du willst",
+                    "Sticker werden in Sticker-Größe (max. 224 px) statt riesig gesendet – umstellbar in den Einstellungen",
+                    "Kurze Videos aus dem Channel werden zu GIFs"
+                ]
+            }
+        },
         {
             "version": "1.0.0",
             "date": "2026-11-09",

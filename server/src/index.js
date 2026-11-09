@@ -18,6 +18,7 @@ if (!DISCORD_TOKEN || !CHANNEL_ID) {
 
 const store = new Store(DATA_DIR);
 await store.load();
+store.backfillSmall().catch(e => console.error("Nachziehen:", e.message));
 
 // ── HTTP ────────────────────────────────────────────────────────────────
 const server = http.createServer(async (req, res) => {
@@ -33,7 +34,8 @@ const server = http.createServer(async (req, res) => {
         return void res.end(JSON.stringify(store.list()));
     }
 
-    const m = /^\/files\/(\d+)\.(png|jpg|gif|webp)$/.exec(url.pathname);
+    // <id>.<ext> = Original, <id>.s.<ext> = kleine Sende-Version
+    const m = /^\/files\/(\d+(?:\.s)?)\.(png|jpg|gif|webp)$/.exec(url.pathname);
     if (m) {
         const file = path.join(store.filesDir, `${m[1]}.${m[2]}`);
         try {
