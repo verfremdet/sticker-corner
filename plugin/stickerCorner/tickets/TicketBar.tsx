@@ -11,7 +11,9 @@ import { Alerts, GuildMemberStore, MessageStore, RestAPI, showToast, useEffect, 
 
 import { lang } from "../i18n";
 import { findSticker, prepareSticker, sendSticker } from "../store";
+import { play, preloadSounds } from "../sounds";
 import { GATEKEEPERS, GREET_STICKER_RE, GREET_TEXT, GUILD_ID, VISIBLE_SUGGESTIONS } from "./config";
+import { Confetti, CreatorInfo, useMoment, VibeDice } from "./extras";
 import { chatFor, creatorOf, isApproved, isChatOpen, isTeamMember, loadVotes, markSeen, sendChat, setChatOpen, setText, subscribe, suggestions, Tally, tallyFor, toggleVote, unreadFor, voteChannel, VoteKind } from "./store";
 
 const cl = classNameFactory("vc-sct-");
@@ -269,6 +271,11 @@ export function TicketBar({ channel }: { channel: Channel; }) {
         }
     };
 
+    // Moments: everyone voted "in" → confetti + cheer; first troll vote → bong + shake
+    useEffect(() => preloadSounds("cheer", "jackpot", "troll", "troll-hit"), []);
+    const celebrating = useMoment(approved, () => { play("cheer", 0.9); setTimeout(() => play("jackpot", 0.7), 180); });
+    const trolled = useMoment(tally.troll.length > 0, () => { play("troll", 0.9); setTimeout(() => play("troll-hit", 0.6), 250); });
+
     const phase = approved ? "welcome" : "vibe";
     // Hide every group from which someone already sent this or a similar question; show the next ones instead
     const all = suggestions();
@@ -280,9 +287,10 @@ export function TicketBar({ channel }: { channel: Channel; }) {
     const chips = [...open.filter(s => s.after), ...open.filter(s => !s.after)].slice(0, VISIBLE_SUGGESTIONS);
 
     return (
-        <div className={cl("bar")}>
+        <div className={cl("bar", celebrating && "bar-party")}>
+            {celebrating && <Confetti />}
             {tally.troll.length > 0 && (
-                <div className={cl("troll")} title={tally.troll.map(nameOf).join(", ")}>
+                <div className={cl("troll", trolled && "troll-shake")} title={tally.troll.map(nameOf).join(", ")}>
                     <span className={cl("troll-text")}>{tt("trollBanner")}</span>
                     <span className={cl("troll-who")}>{tally.troll.map(nameOf).join(" · ")}</span>
                 </div>
@@ -323,14 +331,17 @@ export function TicketBar({ channel }: { channel: Channel; }) {
                 <button className={cl("ban")} onClick={ban} disabled={!creatorId}>{tt("ban")}</button>
             </div>
 
+            {creatorId && <CreatorInfo channelId={channel.id} creatorId={creatorId} />}
+
             {hasVoteChannel && chatOpen && <TeamChat ticketId={channel.id} />}
 
-            {approved && <div className={cl("approved")}>{tt("approved")}</div>}
+            {approved && <div className={cl("approved", celebrating && "approved-pop")}>{tt("approved")}</div>}
 
             <div className={cl("chips")}>
                 {!teamWrote && !approved && (
                     <button className={cl("greet")} onClick={greet}>{tt("greet")}</button>
                 )}
+                {!approved && <VibeDice onSend={send} />}
                 {chips.map(s => <SuggestionChip key={s.id + s.text} id={s.id} text={s.text} edited={s.edited} onSend={send} />)}
             </div>
         </div>

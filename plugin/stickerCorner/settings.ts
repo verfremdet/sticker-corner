@@ -19,6 +19,18 @@ export const settings = definePluginSettings({
             { label: "Original size / Originalgröße", value: "original" },
         ],
     },
+    sounds: {
+        type: OptionType.BOOLEAN,
+        description: "Sounds (slot machine, ticket helper) / Klänge",
+        default: true,
+    },
+    soundVolume: {
+        type: OptionType.SLIDER,
+        description: "Sound volume / Lautstärke",
+        markers: [0, 25, 50, 75, 100],
+        default: 60,
+        stickToMarkers: false,
+    },
     serverUrl: {
         type: OptionType.STRING,
         description: "Sticker server address",

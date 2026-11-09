@@ -42,6 +42,35 @@ export interface Suggestion {
 /** How many suggestions are visible at once; the next ones move up once these were sent */
 export const VISIBLE_SUGGESTIONS = 4;
 
+/** 🎲 Vibe-Check: random, slightly absurd questions */
+export const VIBE_QUESTIONS = [
+    "would you rather fight 1 horse-sized duck or 100 duck-sized horses?",
+    "pineapple on pizza – yes or crime?",
+    "what's the most useless talent you have?",
+    "if you were a sticker, which one would you be?",
+    "what's your go-to karaoke song?",
+    "cats or dogs – choose wisely",
+    "what's the weirdest thing you've ever eaten?",
+    "what would your villain name be?",
+    "describe your vibe with 3 emojis",
+    "what's your hot take that gets you in trouble?",
+    "what's the last thing you googled? (be honest)",
+    "if you had to delete one app forever, which one?",
+    "what's your comfort show or game?",
+    "would you survive a zombie apocalypse? why?",
+    "what's your most unhinged 3am thought?",
+    "what's your favorite meme of all time?",
+    "if your life had a theme song, what would it be?",
+    "what's a red flag you'd ignore anyway?",
+    "night owl or early bird – and why is it night owl?",
+    "what's your toxic trait? (keep it cute)",
+    "what's the best pickup line you know?",
+    "what's your most used emoji?",
+    "if you could only eat one food forever, what would it be?",
+    "rate your rizz from 1 to 10",
+    "what's something you're weirdly good at?",
+];
+
 /** Default suggestions – every team member can rewrite them for themselves (pencil) */
 export const DEFAULT_SUGGESTIONS: Suggestion[] = [
     { id: "vibe-special", phase: "vibe", group: "ask", text: "we wanna know you a bit more, please tell us something special about you", keys: ["something special about you", "know you a bit more"] },

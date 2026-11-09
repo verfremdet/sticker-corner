@@ -59,13 +59,21 @@ const emit = () => listeners.forEach(l => l());
 
 // ── team chat per ticket: "<#ticket> 💬 text" in the same team channel ───
 export interface ChatMessage { messageId: string; userId: string; ticketId: string; text: string; }
-const CHAT_RE = /^<#(d{5,25})> 💬 ([sS]{1,1900})$/;
+const TICKET_MENTION_RE = /<#(\d{5,25})>/;
 let chats = new Map<string, ChatMessage>();
 
+/**
+ * Chat = any team message in #ticket-votes that mentions the ticket (#ticket-95), also typed by hand
+ * in Discord – except the vote lines ("<#…> · in").
+ */
 function parseChat(m: { id: string; content?: string; author?: { id: string; }; }): ChatMessage | null {
-    const match = CHAT_RE.exec(m.content ?? "");
-    if (!match || !m.author || !isTeamMember(m.author.id)) return null;
-    return { messageId: m.id, userId: m.author.id, ticketId: match[1], text: match[2] };
+    const content = m.content ?? "";
+    if (VOTE_RE.test(content) || !m.author || !isTeamMember(m.author.id)) return null;
+    const match = TICKET_MENTION_RE.exec(content);
+    if (!match) return null;
+    const text = content.replace(TICKET_MENTION_RE, "").replace(/^\s*💬\s*/u, "").trim();
+    if (!text) return null;
+    return { messageId: m.id, userId: m.author.id, ticketId: match[1], text: text.slice(0, 1900) };
 }
 
 const byId = (a: { messageId: string; }, b: { messageId: string; }) =>

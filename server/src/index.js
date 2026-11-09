@@ -4,12 +4,14 @@ import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import http from "node:http";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { Client, Events, GatewayIntentBits, Partials } from "discord.js";
 import { cleanText, mediaExt, Store, TYPE_BY_EXT } from "./store.js";
 
 const { DISCORD_TOKEN, CHANNEL_ID } = process.env;
 const PORT = Number(process.env.PORT ?? 8790);
 const DATA_DIR = process.env.DATA_DIR ?? path.resolve("data");
+const SOUNDS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "sounds");
 
 if (!DISCORD_TOKEN || !CHANNEL_ID) {
     console.error("DISCORD_TOKEN und CHANNEL_ID fehlen in .env");
@@ -73,6 +75,19 @@ const server = http.createServer(async (req, res) => {
                 "Content-Length": st.size,
                 "Cache-Control": "public, max-age=31536000, immutable",
             });
+            return void createReadStream(file).pipe(res);
+        } catch {
+            return void res.writeHead(404).end();
+        }
+    }
+
+    // Short sounds for the plugin (Kenney, CC0) – fixed list, no paths from outside
+    const snd = /^\/sounds\/([a-z-]{1,30})\.ogg$/.exec(url.pathname);
+    if (snd) {
+        const file = path.join(SOUNDS_DIR, `${snd[1]}.ogg`);
+        try {
+            const st = await stat(file);
+            res.writeHead(200, { "Content-Type": "audio/ogg", "Content-Length": st.size, "Cache-Control": "public, max-age=86400" });
             return void createReadStream(file).pipe(res);
         } catch {
             return void res.writeHead(404).end();

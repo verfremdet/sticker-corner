@@ -1,6 +1,24 @@
 {
-    "version": "1.6.0",
+    "version": "1.7.0",
     "news": [
+        {
+            "version": "1.7.0",
+            "date": "2026-11-09",
+            "items": {
+                "en": [
+                    "Team: ticket chat fixed (also shows messages typed by hand in #ticket-votes)",
+                    "Team: ticket profile – age from the date of birth (any format), account age, joined, mutual servers",
+                    "Team: 🎲 Vibe-Check, confetti when everyone votes In, troll sound",
+                    "Quiet sounds (Kenney, CC0) – can be switched off in the plugin settings"
+                ],
+                "de": [
+                    "Team: Ticket-Chat repariert (zeigt auch von Hand geschriebene Nachrichten in #ticket-votes)",
+                    "Team: Ticket-Steckbrief – Alter aus dem Geburtsdatum (jedes Format), Account-Alter, beigetreten, gemeinsame Server",
+                    "Team: 🎲 Vibe-Check, Konfetti wenn alle Rein sagen, Troll-Sound",
+                    "Leise Klänge (Kenney, CC0) – in den Plugin-Einstellungen abschaltbar"
+                ]
+            }
+        },
         {
             "version": "1.6.0",
             "date": "2026-11-09",
