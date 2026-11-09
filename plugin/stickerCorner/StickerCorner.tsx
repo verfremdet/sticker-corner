@@ -113,7 +113,7 @@ export function StickerCornerPanel({ channel, close }: Props) {
                         </div>
                     </>
                 ) : (
-                    <div className={cl("footer-brand")}>Sticker Corner</div>
+                    <div className={cl("footer-brand")}>,, Sticker Corner ,,</div>
                 )}
             </div>
         </div>
