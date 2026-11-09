@@ -53,6 +53,8 @@ export function FitsBar({ channel }: { channel: Channel; }) {
     const { stickers, loaded } = useStickers();
     const [fits, setFits] = useState<Suggestion[]>([]);
     const [tick, setTick] = useState(0);
+    const [peek, setPeek] = useState<{ f: Suggestion; x: number; } | null>(null);
+    const barRef = useRef<HTMLDivElement>(null);
 
     // new message in this chat → think again (a little later, the store needs a moment)
     useEffect(() => {
@@ -93,7 +95,7 @@ export function FitsBar({ channel }: { channel: Channel; }) {
     };
 
     return (
-        <div className={cl("fb", bar.collapsed && "fb-collapsed")} style={{ ["--fb-size" as any]: `${bar.size}px` }}>
+        <div ref={barRef} className={cl("fb", bar.collapsed && "fb-collapsed")} onMouseLeave={() => setPeek(null)} style={{ ["--fb-size" as any]: `${bar.size}px` }}>
             {!bar.collapsed && (
                 <div
                     className={cl("fb-grip")}
@@ -122,8 +124,16 @@ export function FitsBar({ channel }: { channel: Channel; }) {
                             key={f.key}
                             className={cl("fb-item")}
                             onClick={() => send(f)}
-                            onMouseEnter={() => f.sticker && prepareSticker(f.sticker, channel.id)}
-                            title={f.sticker?.name ?? "GIF"}
+                            onMouseEnter={e => {
+                                if (f.sticker) prepareSticker(f.sticker, channel.id);
+                                const b = barRef.current?.getBoundingClientRect();
+                                const r = e.currentTarget.getBoundingClientRect();
+                                if (!b) return;
+                                // keep the big preview inside the bar's width
+                                const x = Math.min(b.width - 100, Math.max(100, r.left - b.left + r.width / 2));
+                                setPeek({ f, x });
+                            }}
+                            onMouseLeave={() => setPeek(null)}
                         >
                             {f.sticker
                                 ? <img src={smallUrl(f.sticker)} alt={f.sticker.name} draggable={false} />
@@ -133,6 +143,16 @@ export function FitsBar({ channel }: { channel: Channel; }) {
                             {f.gif && <span className={cl("gif-badge")}>GIF</span>}
                         </button>
                     ))}
+                </div>
+            )}
+            {peek && !bar.collapsed && (
+                <div key={peek.f.key} className={cl("fb-peek")} style={{ left: peek.x }} aria-hidden="true">
+                    {peek.f.sticker
+                        ? <img src={smallUrl(peek.f.sticker)} alt="" />
+                        : peek.f.gif!.video
+                            ? <video src={peek.f.gif!.src} autoPlay loop muted playsInline />
+                            : <img src={peek.f.gif!.src} alt="" />}
+                    {peek.f.sticker?.name && <div className={cl("fb-peek-name")}>{peek.f.sticker.name}</div>}
                 </div>
             )}
         </div>

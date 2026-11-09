@@ -1,6 +1,18 @@
 {
-    "version": "1.12.1",
+    "version": "1.12.2",
     "news": [
+        {
+            "version": "1.12.2",
+            "date": "2026-11-09",
+            "items": {
+                "en": [
+                    "Fits right now bar: hover a sticker or GIF and it pops up big above the bar, with its name"
+                ],
+                "de": [
+                    "Passt-gerade-Leiste: mit der Maus über einen Sticker oder ein GIF – es springt groß über der Leiste auf, mit Namen"
+                ]
+            }
+        },
         {
             "version": "1.12.1",
             "date": "2026-11-09",
