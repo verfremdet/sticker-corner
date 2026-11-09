@@ -6,9 +6,12 @@ import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Client, Events, GatewayIntentBits, Partials } from "discord.js";
+import { Brain } from "./brain.js";
 import { cleanText, mediaExt, Store, TYPE_BY_EXT } from "./store.js";
 
 const { DISCORD_TOKEN, CHANNEL_ID } = process.env;
+// Lobbys, aus denen die Vorschläge lernen (Lobby DE, Lobby EN)
+const LOBBY_IDS = (process.env.LOBBY_IDS ?? "1554676725303087216,1554695971676622948").split(",").filter(Boolean);
 const PORT = Number(process.env.PORT ?? 8790);
 const DATA_DIR = process.env.DATA_DIR ?? path.resolve("data");
 const SOUNDS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "sounds");
@@ -21,6 +24,8 @@ if (!DISCORD_TOKEN || !CHANNEL_ID) {
 const store = new Store(DATA_DIR);
 await store.load();
 store.channelId = CHANNEL_ID;
+const brain = new Brain(DATA_DIR, store, LOBBY_IDS);
+await brain.load();
 
 // „Beliebt“-Zähler: je IP und Sticker höchstens 1× pro 10 min, je IP höchstens 120 pro Stunde
 const USE_SAME_MS = 10 * 60_000;
@@ -53,6 +58,15 @@ const server = http.createServer(async (req, res) => {
         if (req.headers["if-none-match"] === etag) return void res.writeHead(304).end();
         res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
         return void res.end(JSON.stringify(store.list()));
+    }
+
+    if (url.pathname === "/api/brain") {
+        const etag = `"b${brain.version}"`;
+        res.setHeader("ETag", etag);
+        res.setHeader("Cache-Control", "no-cache");
+        if (req.headers["if-none-match"] === etag) return void res.writeHead(304).end();
+        res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+        return void res.end(JSON.stringify(brain.list()));
     }
 
     const used = /^\/api\/used\/(\d{5,25})$/.exec(url.pathname);
@@ -112,14 +126,19 @@ const client = new Client({
 
 const isOurChannel = msg => msg.channelId === CHANNEL_ID;
 
+/** GIFs that steal.js copied from the lobby: posted by this bot, files named "lobby__…" */
+const isStolen = message => message.author?.id === client.user?.id && message.attachments.size > 0 &&
+    [...message.attachments.values()].every(a => (a.name ?? "").startsWith("lobby__"));
+const isPerson = message => !message.author?.bot || isStolen(message);
+
 const hasMedia = message => [...message.attachments.values()].some(a => mediaExt(a));
 /** Antwort ohne eigenes Bild → benennt das Bild, auf das geantwortet wurde */
 const replyTarget = message =>
     !message.author?.bot && !hasMedia(message) ? message.reference?.messageId ?? null : null;
 
 async function addMessage(message, { live = true } = {}) {
-    // Bot messages (e.g. the pinned how-to with screenshot) are never stickers
-    if (message.author?.bot) return;
+    // Bot messages (e.g. the pinned how-to with screenshot) are never stickers – except stolen lobby GIFs
+    if (!isPerson(message)) return;
     const target = replyTarget(message);
     if (target) {
         if (store.nameByReply(target, message) && live && cleanText(message.content)) {
@@ -131,7 +150,10 @@ async function addMessage(message, { live = true } = {}) {
     for (const attachment of message.attachments.values()) {
         if (!mediaExt(attachment)) continue;
         try {
-            if (await store.add({ attachment, message })) console.log(`+ ${attachment.name} (${message.author?.username})`);
+            if (await store.add({ attachment, message })) {
+                brain.stickersChanged();
+                console.log(`+ ${attachment.name} (${message.author?.username})`);
+            }
         } catch (e) {
             console.error(`Bild ${attachment.id}:`, e.message);
         }
@@ -150,7 +172,7 @@ async function fullSync() {
         const batch = await channel.messages.fetch({ limit: 100, before });
         if (batch.size === 0) break;
         for (const message of batch.values()) {
-            if (!message.author?.bot) for (const a of message.attachments.values()) if (mediaExt(a)) seen.add(a.id);
+            if (isPerson(message)) for (const a of message.attachments.values()) if (mediaExt(a)) seen.add(a.id);
             // Antworten erst nach allen Bildern anwenden (Verlauf kommt von neu nach alt)
             if (replyTarget(message)) replies.push(message);
             else await addMessage(message, { live: false });
@@ -164,6 +186,14 @@ async function fullSync() {
     console.log(`Abgleich fertig: ${store.stickers.size} Sticker`);
 }
 
+async function learnLobbies() {
+    try {
+        await brain.scan(client);
+    } catch (e) {
+        console.error("Lernen:", e.message);
+    }
+}
+
 client.once(Events.ClientReady, async c => {
     console.log(`Eingeloggt als ${c.user.tag}`);
     try {
@@ -171,12 +201,16 @@ client.once(Events.ClientReady, async c => {
     } catch (e) {
         console.error("Abgleich:", e.message);
     }
+    await learnLobbies();
 });
 
-client.on(Events.MessageCreate, m => isOurChannel(m) && addMessage(m));
+client.on(Events.MessageCreate, m => {
+    if (isOurChannel(m)) addMessage(m);
+    else brain.onMessage(m).catch(e => console.error("Lernen live:", e.message));
+});
 
 client.on(Events.MessageDelete, async m => {
-    if (!isOurChannel(m)) return;
+    if (!isOurChannel(m)) return void brain.onDelete(m.id);
     for (const id of store.idsOfMessage(m.id)) await store.remove(id);
     store.dropReply(m.id);
 });

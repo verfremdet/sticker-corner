@@ -273,6 +273,27 @@ export function StickerCornerPanel({ channel, close }: Props) {
     };
     useEffect(() => () => clearTimeout(prepTimer.current), []);
 
+    // The bigger picker must never stick out of the Discord window (small window, ticket bar, reply bar …):
+    // measure it and shrink it until the bottom bar with the name is fully visible again.
+    useLayoutEffect(() => {
+        const wrap = document.querySelector<HTMLElement>('[class*="drawerSizingWrapper"]');
+        if (!wrap) return;
+        const fit = () => {
+            wrap.style.removeProperty("height");
+            const r = wrap.getBoundingClientRect();
+            const over = Math.max(r.bottom - (window.innerHeight - 8), 8 - r.top, 0);
+            if (over > 0) wrap.style.setProperty("height", `${Math.max(320, r.height - over)}px`, "important");
+        };
+        fit();
+        const again = setTimeout(fit, 120); // Discord positions the picker a moment later
+        window.addEventListener("resize", fit);
+        return () => {
+            clearTimeout(again);
+            window.removeEventListener("resize", fit);
+            wrap.style.removeProperty("height");
+        };
+    }, []);
+
     // Picker open: load all small images, and already upload the top favorites/recent → first click is instant
     useEffect(() => {
         if (!loaded || !stickers.length) return;

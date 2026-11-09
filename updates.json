@@ -1,6 +1,24 @@
 {
-    "version": "1.10.0",
+    "version": "1.11.0",
     "news": [
+        {
+            "version": "1.11.0",
+            "date": "2026-11-09",
+            "items": {
+                "en": [
+                    "✨ Fits right now learned from the lobby chats: which GIF people sent after which words – your own lobby GIFs count most",
+                    "Gets smarter by itself: new lobby GIFs are learned live, no update needed",
+                    "63 popular lobby GIFs are now in the Sticker Corner (category Lobby)",
+                    "Fix: the bar at the bottom (name of the sticker) no longer disappears in small windows"
+                ],
+                "de": [
+                    "✨ Passt gerade hat aus den Lobby-Chats gelernt: welches GIF nach welchen Worten kam – deine eigenen Lobby-GIFs zählen am meisten",
+                    "Wird von selbst schlauer: neue Lobby-GIFs lernt der Server sofort mit, ohne Update",
+                    "63 beliebte Lobby-GIFs sind jetzt im Sticker Corner (Kategorie Lobby)",
+                    "Fix: die Leiste unten (Name des Stickers) verschwindet in kleinen Fenstern nicht mehr"
+                ]
+            }
+        },
         {
             "version": "1.10.0",
             "date": "2026-11-09",

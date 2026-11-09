@@ -10,12 +10,16 @@
  *  - Moods: "lol", "xd", 😂 → laugh · "sad", 😭 → sad · "no", "nein" → no · … for chat and names alike.
  *  - Feedback: a suggestion you click is learned again (stronger); suggestions you keep ignoring sink slowly.
  *  - A little exploration so new stickers get a chance.
+ *  - Shared brain: the server learns from the lobby chats (which GIF came after which words) and sends
+ *    those examples as hashed word bags (/api/brain). They are mixed in – your own lobby GIFs count more.
+ *    New lobby GIFs are learned live on the server, so this gets smarter without a plugin update.
  */
 
 import * as DataStore from "@api/DataStore";
 import { FluxDispatcher, MessageStore, UserSettingsProtoStore, UserStore } from "@webpack/common";
 
 import { categoriesOf } from "./categories";
+import { settings } from "./settings";
 import type { Sticker } from "./store";
 
 // ── tokens ──────────────────────────────────────────────────────────────
@@ -87,6 +91,13 @@ function gifWords(url: string): string {
             .filter(p => /^[a-zäöü]{2,}$/i.test(p) && !["view", "gif", "gifs", "media", "tenor", "giphy", "attachments", "external"].includes(p.toLowerCase()))
             .join(" ");
     } catch { return ""; }
+}
+
+/** FNV-1a 32 bit, base36 – same as server/src/tokens.js hashTok */
+export function hashTok(s: string): string {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+    return h.toString(36);
 }
 
 // ── memory ──────────────────────────────────────────────────────────────
@@ -187,12 +198,86 @@ function onMessageCreate({ message, optimistic }: any) {
     learn(message.channel_id, `g:${content}`, gif, message.id);
 }
 
+// ── shared brain from the lobbies (server) ──────────────────────────────
+interface SharedExample { k: ItemKey; at: number; u: string; v: Record<string, number>; w: Record<string, number>; norm: number; }
+const BRAIN_KEY = "StickerCorner_brain";
+const BRAIN_HALF_LIFE = 120 * 86_400_000;
+const BRAIN_POLL_MS = 20 * 60_000;
+let shared: SharedExample[] = [];
+let sharedGifs: Record<string, GifItem> = {};
+let sharedDf: Record<string, number> = {};
+let brainVersion: number | undefined;
+let brainTimer: ReturnType<typeof setInterval> | undefined;
+
+function useBrain(data: any) {
+    const list: SharedExample[] = (data?.examples ?? []).filter((e: any) => e?.k && e?.v);
+    sharedDf = {};
+    for (const e of list) for (const h of Object.keys(e.v)) sharedDf[h] = (sharedDf[h] ?? 0) + 1;
+    const N = Math.max(1, list.length);
+    for (const e of list) {
+        e.w = {};
+        let n = 0;
+        for (const [h, v] of Object.entries(e.v)) { const x = v * Math.log(1 + N / (1 + sharedDf[h])); e.w[h] = x; n += x * x; }
+        e.norm = Math.sqrt(n);
+    }
+    shared = list;
+    sharedGifs = {};
+    for (const [url, g] of Object.entries<any>(data?.gifs ?? {})) sharedGifs[url] = { url, src: g.src ?? url, video: !!g.video, width: g.width ?? 0, height: g.height ?? 0 };
+}
+
+async function loadBrain() {
+    try {
+        const base = settings.store.serverUrl.replace(/\/+$/, "");
+        // no extra headers (would need a CORS preflight) – the browser cache does the ETag check
+        const res = await fetch(`${base}/api/brain`, { cache: "no-cache" });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data?.version === brainVersion) return;
+        brainVersion = data?.version;
+        useBrain(data);
+        DataStore.set(BRAIN_KEY, data);
+    } catch { /* offline – the cached brain stays */ }
+}
+
 export function startSuggest() {
     loadMemory();
+    DataStore.get(BRAIN_KEY).then(d => { if (d && !shared.length) useBrain(d); });
+    loadBrain();
+    brainTimer = setInterval(loadBrain, BRAIN_POLL_MS);
     FluxDispatcher.subscribe("MESSAGE_CREATE", onMessageCreate);
 }
 export function stopSuggest() {
+    clearInterval(brainTimer);
     FluxDispatcher.unsubscribe("MESSAGE_CREATE", onMessageCreate);
+}
+
+/** shared examples similar to the chat → key → score (own lobby GIFs count more) */
+function sharedScores(ctx: Record<string, number>, now: number): Map<ItemKey, number> {
+    const out = new Map<ItemKey, number>();
+    if (!shared.length) return out;
+    const N = shared.length;
+    const q: Record<string, number> = {};
+    let qn = 0;
+    for (const [t, v] of Object.entries(ctx)) {
+        const h = hashTok(t);
+        const df = sharedDf[h];
+        if (!df) continue;
+        q[h] = (q[h] ?? 0) + v * Math.log(1 + N / (1 + df));
+    }
+    for (const v of Object.values(q)) qn += v * v;
+    if (!qn) return out;
+    qn = Math.sqrt(qn);
+    const me = hashTok(UserStore.getCurrentUser()?.id ?? "");
+    for (const e of shared) {
+        let dot = 0;
+        for (const [h, v] of Object.entries(q)) if (e.w[h]) dot += v * e.w[h];
+        if (!dot) continue;
+        const sim = dot / (qn * e.norm);
+        if (sim <= 0.08) continue;
+        const decay = Math.pow(0.5, (now - e.at) / BRAIN_HALF_LIFE);
+        out.set(e.k, (out.get(e.k) ?? 0) + sim * decay * (e.u === me ? 1.3 : 0.6));
+    }
+    return out;
 }
 
 // ── ranking ─────────────────────────────────────────────────────────────
@@ -244,10 +329,13 @@ export function suggest(channelId: string, stickers: Sticker[], favoriteGifs: Gi
         if (e.channelId === channelId) inChannel.set(e.key, (inChannel.get(e.key) ?? 0) + 0.15 * decay);
     }
 
+    const crowd = sharedScores(ctx, now);
+
     const scored: Suggestion[] = [];
     const scoreOf = (key: ItemKey, prior: number, habit: number) => {
         const l = learned.get(key) ?? 0;
-        return 1.0 * Math.min(l, 3) + 0.9 * prior + habit + (inChannel.get(key) ?? 0) - 0.12 * (ignored[key] ?? 0);
+        const c = crowd.get(key) ?? 0;
+        return 1.0 * Math.min(l, 3) + 0.8 * Math.min(c, 2) + 0.9 * prior + habit + (inChannel.get(key) ?? 0) - 0.12 * (ignored[key] ?? 0);
     };
 
     for (const s of stickers) {
@@ -258,7 +346,7 @@ export function suggest(channelId: string, stickers: Sticker[], favoriteGifs: Gi
         if (score > 0.12) scored.push({ key, sticker: s, score });
     }
 
-    const gifs = new Map<string, GifItem>([...Object.values(knownGifs), ...favoriteGifs].map(g => [g.url, g]));
+    const gifs = new Map<string, GifItem>([...Object.values(sharedGifs), ...Object.values(knownGifs), ...favoriteGifs].map(g => [g.url, g]));
     for (const g of gifs.values()) {
         const prior = cosine(ctx, tokenize(gifWords(g.url)));
         const key = `g:${g.url}`;
@@ -271,7 +359,7 @@ export function suggest(channelId: string, stickers: Sticker[], favoriteGifs: Gi
 
     // exploration: sometimes swap the last slot for a fitting-by-name sticker never used yet
     if (top.length >= 3 && Math.random() < 0.15) {
-        const fresh = scored.find(s => s.sticker && !learned.has(s.key) && !top.includes(s));
+        const fresh = scored.find(s => s.sticker && !learned.has(s.key) && !crowd.has(s.key) && !top.includes(s));
         if (fresh) top[top.length - 1] = fresh;
     }
     return top;
