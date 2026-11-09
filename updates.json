@@ -1,6 +1,18 @@
 {
-    "version": "1.4.1",
+    "version": "1.4.2",
     "news": [
+        {
+            "version": "1.4.2",
+            "date": "2026-11-09",
+            "items": {
+                "en": [
+                    "Fix: the tab no longer sticks out of the picker; categories scroll sideways (mouse wheel works)"
+                ],
+                "de": [
+                    "Fix: Der Reiter ragt nicht mehr aus dem Fenster; Kategorien scrollen seitlich (auch per Mausrad)"
+                ]
+            }
+        },
         {
             "version": "1.4.1",
             "date": "2026-11-09",

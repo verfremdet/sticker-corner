@@ -22,6 +22,16 @@
     flex: 1 1 auto;
     min-height: 0;
     height: 100%;
+    /* never wider than the picker – the category row scrolls instead of stretching the panel */
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+}
+
+.vc-sc-panel > * {
+    min-width: 0;
+    max-width: 100%;
 }
 
 /* Suche */
@@ -360,6 +370,11 @@
     padding: 2px 16px 10px;
     overflow-x: auto;
     scrollbar-width: none;
+    width: 100%;
+    box-sizing: border-box;
+    contain: inline-size;
+    /* fade at the right edge shows there are more categories */
+    mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
 }
 
 .vc-sc-chips::-webkit-scrollbar {

@@ -130,7 +130,12 @@ function UpdateBanner() {
 function CategoryChips({ chips, active, onPick }: { chips: CategoryChip[]; active: string | null; onPick(id: string | null): void; }) {
     if (!chips.length) return null;
     return (
-        <div className={cl("chips")} role="toolbar">
+        <div
+            className={cl("chips")}
+            role="toolbar"
+            // mouse wheel scrolls the row sideways
+            onWheel={e => { if (e.deltaY && !e.deltaX) e.currentTarget.scrollLeft += e.deltaY; }}
+        >
             <button className={cl("chip", !active && "chip-active")} onClick={() => onPick(null)}>{t("allCategories")}</button>
             {chips.map(c => (
                 <button
