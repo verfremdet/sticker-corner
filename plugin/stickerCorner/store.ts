@@ -7,7 +7,7 @@ import { CloudUpload as TCloudUpload } from "@vencord/discord-types";
 import { CloudUploadPlatform } from "@vencord/discord-types/enums";
 import { PluginNative } from "@utils/types";
 import { findLazy } from "@webpack";
-import { Constants, FluxDispatcher, MessageActions, PendingReplyStore, RestAPI, showToast, SnowflakeUtils, useEffect, useState } from "@webpack/common";
+import { ChannelStore, Constants, FluxDispatcher, MessageActions, PendingReplyStore, PermissionsBits, PermissionStore, RestAPI, showToast, SnowflakeUtils, useEffect, useState } from "@webpack/common";
 
 import { t } from "./i18n";
 import { settings } from "./settings";
@@ -22,6 +22,8 @@ export interface Sticker {
     height: number;
     author: string;
     createdAt: number;
+    /** message in the sticker channel the image came from (for renaming by reply) */
+    messageId?: string;
     /** how often plugin users sent it (for "Popular") */
     uses?: number;
 }
@@ -142,7 +144,40 @@ export function toggleFavorite(id: string) {
     emit();
 }
 
-export const findSticker = (pred: (s: Sticker) => boolean) => stickers.find(pred);
+/** May I post in the sticker channel? (add + rename are only offered then) */
+export function canPost(): boolean {
+    const channel = ChannelStore.getChannel(channelId);
+    if (!channel) return false; // no access to the channel at all
+    return PermissionStore.can(PermissionsBits.SEND_MESSAGES | PermissionsBits.ATTACH_FILES, channel);
+}
+
+/** Rename = reply to the image in the sticker channel; the server takes the newest reply as the name */
+export async function renameSticker(s: Sticker, name: string): Promise<boolean> {
+    const clean = name.trim().slice(0, 60);
+    if (!clean || !s.messageId || !/^\d{5,25}$/.test(s.messageId)) return false;
+    const channel = ChannelStore.getChannel(channelId);
+    try {
+        await RestAPI.post({
+            url: Constants.Endpoints.MESSAGES(channelId),
+            body: {
+                content: clean,
+                nonce: SnowflakeUtils.fromTimestamp(Date.now()),
+                message_reference: { message_id: s.messageId, channel_id: channelId, guild_id: channel?.guild_id },
+                allowed_mentions: { parse: [], replied_user: false },
+            },
+        });
+    } catch {
+        showToast({ text: t("renameFailed"), variant: "critical" });
+        return false;
+    }
+    // show it right away, the server confirms within seconds
+    s.name = clean;
+    emit();
+    setTimeout(refresh, 3000);
+    return true;
+}
+
+export const findSticker =(pred: (s: Sticker) => boolean) => stickers.find(pred);
 
 // ── fast sending ────────────────────────────────────────────────────────
 // Sending used to be: load image → upload to Discord → post message, all after the click.

@@ -47,6 +47,11 @@ const en = {
     added: "Added – everyone has it within 30 s",
     addFailed: "Couldn't add the image",
     tooBig: "Image is too big (max. 10 MB)",
+    rename: "Rename",
+    renameTitle: "Rename sticker",
+    renameButton: "Save",
+    renameNote: "Posted as a reply to the image in the sticker channel – the newest reply is the name for everyone.",
+    renameFailed: "Couldn't rename the sticker",
 };
 
 const de: typeof en = {
@@ -91,6 +96,11 @@ const de: typeof en = {
     added: "Hinzugefügt – in 30 s bei allen",
     addFailed: "Bild konnte nicht hinzugefügt werden",
     tooBig: "Bild ist zu groß (max. 10 MB)",
+    rename: "Umbenennen",
+    renameTitle: "Sticker umbenennen",
+    renameButton: "Speichern",
+    renameNote: "Wird als Antwort auf das Bild im Sticker-Channel gepostet – die neueste Antwort ist der Name für alle.",
+    renameFailed: "Sticker konnte nicht umbenannt werden",
 };
 
 export type Lang = "en" | "de";

@@ -8,7 +8,8 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "@webpack/
 
 import { CategoryChip, categoriesOf, chipsFor } from "./categories";
 import { t } from "./i18n";
-import { prepareSticker, sendSticker, smallUrl, Sticker, toggleFavorite, useStickers } from "./store";
+import { openRenameModal } from "./contextMenu";
+import { canPost, prepareSticker, sendSticker, smallUrl, Sticker, toggleFavorite, useStickers } from "./store";
 import { dismissWhatsNew, itemsOf, restartDiscord, runUpdate, useUpdate, useWhatsNew } from "./updater";
 import { VERSION } from "./version";
 
@@ -45,9 +46,19 @@ interface TileHandlers {
     onSend(s: Sticker, e: React.MouseEvent): void;
     onHover(s: Sticker | null): void;
     isFavorite(id: string): boolean;
+    /** may rename (= may post in the sticker channel) */
+    canEdit: boolean;
 }
 
-function Tile({ sticker, onSend, onHover, isFavorite }: TileHandlers & { sticker: Sticker; }) {
+function PencilIcon() {
+    return (
+        <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="currentColor" d="M14.7 3.3a2.4 2.4 0 0 1 3.4 0l2.6 2.6a2.4 2.4 0 0 1 0 3.4L9.4 20.6a2 2 0 0 1-1 .55l-4.3.95a.9.9 0 0 1-1.07-1.07l.95-4.3a2 2 0 0 1 .55-1zM13.3 7.1 5.9 14.5l-.6 2.9.3.3 2.9-.6 7.4-7.4z" />
+        </svg>
+    );
+}
+
+function Tile({ sticker, onSend, onHover, isFavorite, canEdit }: TileHandlers & { sticker: Sticker; }) {
     const fav = isFavorite(sticker.id);
     const label = sticker.name || "Sticker";
     return (
@@ -61,14 +72,26 @@ function Tile({ sticker, onSend, onHover, isFavorite }: TileHandlers & { sticker
             >
                 <img src={smallUrl(sticker)} alt={label} loading="lazy" draggable={false} />
             </button>
-            <button
-                className={cl("star")}
-                onClick={() => toggleFavorite(sticker.id)}
-                aria-label={fav ? t("removeFavorite") : t("addFavorite")}
-                title={fav ? t("removeFavorite") : t("addFavorite")}
-            >
-                <StarIcon filled={fav} />
-            </button>
+            <div className={cl("actions")}>
+                {canEdit && sticker.messageId && (
+                    <button
+                        className={cl("action", "edit")}
+                        onClick={() => openRenameModal(sticker)}
+                        aria-label={t("rename")}
+                        title={t("rename")}
+                    >
+                        <PencilIcon />
+                    </button>
+                )}
+                <button
+                    className={cl("action", "star")}
+                    onClick={() => toggleFavorite(sticker.id)}
+                    aria-label={fav ? t("removeFavorite") : t("addFavorite")}
+                    title={fav ? t("removeFavorite") : t("addFavorite")}
+                >
+                    <StarIcon filled={fav} />
+                </button>
+            </div>
         </div>
     );
 }
@@ -210,7 +233,8 @@ export function StickerCornerPanel({ channel, close }: Props) {
     };
     useEffect(() => () => clearTimeout(prepTimer.current), []);
 
-    const handlers: TileHandlers = { onSend, onHover, isFavorite };
+    const canEdit = useMemo(() => canPost(), [stickers]);
+    const handlers: TileHandlers = { onSend, onHover, isFavorite, canEdit };
 
     // Always open at the top (favorites first). Favorites/recent load a moment later and
     // land above "All" – keep pinning to the top until the user scrolls themselves.

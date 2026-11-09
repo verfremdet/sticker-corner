@@ -1,6 +1,20 @@
 {
-    "version": "1.4.5",
+    "version": "1.5.0",
     "news": [
+        {
+            "version": "1.5.0",
+            "date": "2026-11-09",
+            "items": {
+                "en": [
+                    "Bigger window and bigger stickers in Sticker Corner",
+                    "Pencil on a sticker: rename it (if you can post in the sticker channel)"
+                ],
+                "de": [
+                    "Größeres Fenster und größere Sticker in Sticker Corner",
+                    "Bleistift am Sticker: umbenennen (wenn du in den Sticker-Channel posten darfst)"
+                ]
+            }
+        },
         {
             "version": "1.4.5",
             "date": "2026-11-09",
