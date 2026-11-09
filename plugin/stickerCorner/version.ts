@@ -1,2 +1,2 @@
 // Bei jeder Änderung hochzählen UND in updates.json (Repo-Wurzel) eintragen.
-export const VERSION = "1.11.0";
+export const VERSION = "1.12.0";

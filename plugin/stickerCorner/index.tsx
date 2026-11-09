@@ -14,6 +14,7 @@ import { ChannelStore, ExpressionPickerStore } from "@webpack/common";
 import type { ComponentType, ReactNode } from "react";
 
 import { StickerCornerChatButton, StickerCornerIcon, VIEW } from "./chatButton";
+import { FitsBar } from "./fitsBar";
 import { imageContextMenuPatch, messageContextMenuPatch } from "./contextMenu";
 import { t } from "./i18n";
 import { canReplyIn, replyWithSticker } from "./reply";
@@ -93,6 +94,11 @@ export default definePlugin({
         try {
             // only the normal message box (not threads/edit), only in tickets, only for the team
             if (type?.analyticsName !== "normal") return;
+            if (settings.store.fitsBar) stacked.unshift(
+                <ErrorBoundary key="vc-sc-fits" noop>
+                    <FitsBar channel={channel} />
+                </ErrorBoundary>
+            );
             if (!isTicket(channel) || !isTeam()) return;
             stacked.unshift(
                 <ErrorBoundary key="vc-sct-bar" noop>

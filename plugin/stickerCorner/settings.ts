@@ -19,6 +19,11 @@ export const settings = definePluginSettings({
             { label: "Original size / Originalgröße", value: "original" },
         ],
     },
+    fitsBar: {
+        type: OptionType.BOOLEAN,
+        description: "✨ Fits right now above the message box / Passt gerade über dem Eingabefeld",
+        default: true,
+    },
     sounds: {
         type: OptionType.BOOLEAN,
         description: "Sounds (slot machine, ticket helper) / Klänge",

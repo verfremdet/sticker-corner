@@ -1,6 +1,22 @@
 {
-    "version": "1.11.0",
+    "version": "1.12.0",
     "news": [
+        {
+            "version": "1.12.0",
+            "date": "2026-11-09",
+            "items": {
+                "en": [
+                    "✨ Fits right now now sits right above the message box in every chat and updates with new messages",
+                    "Drag its top edge to make it bigger or smaller, click the title to fold it",
+                    "✕ hides it in one chat – turn it back on in the sticker window (or off everywhere in the settings)"
+                ],
+                "de": [
+                    "✨ Passt gerade sitzt jetzt direkt über dem Eingabefeld in jedem Chat und denkt bei neuen Nachrichten neu",
+                    "Oberen Rand ziehen = größer oder kleiner, Titel anklicken = einklappen",
+                    "✕ blendet es in einem Chat aus – im Sticker-Fenster wieder einschalten (oder in den Einstellungen überall aus)"
+                ]
+            }
+        },
         {
             "version": "1.11.0",
             "date": "2026-11-09",

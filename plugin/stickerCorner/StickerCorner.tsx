@@ -7,7 +7,8 @@ import { Channel } from "@vencord/discord-types";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "@webpack/common";
 
 import { CategoryChip, categoriesOf, categoryLabel as catLabel, chipsFor } from "./categories";
-import { t } from "./i18n";
+import { isBarHidden, setBarHidden } from "./fitsBar";
+import { lang, t } from "./i18n";
 import { openEditModal, openNewCategoryModal } from "./editSticker";
 import { sendMessage } from "@utils/discord";
 
@@ -378,7 +379,14 @@ export function StickerCornerPanel({ channel, close }: Props) {
             <>
                 {!narrowed && fits.length > 0 && (
                     <section className={cl("section", "section-fits")}>
-                        <h3 className={cl("section-title")}>{t("fitsNow")}</h3>
+                        <h3 className={cl("section-title")}>
+                            {t("fitsNow")}
+                            {isBarHidden(channel.id) && (
+                                <button className={cl("fb-show")} onClick={() => setBarHidden(channel.id, false)}>
+                                    {lang() === "de" ? "über dem Chat zeigen" : "show above the chat"}
+                                </button>
+                            )}
+                        </h3>
                         <div className={cl("grid")}>
                             {fits.map(f => f.sticker
                                 ? <Tile key={f.key} sticker={f.sticker} {...handlers} onSend={(st, e) => { usedFit.current = true; onSend(st, e); }} />
