@@ -2,9 +2,11 @@
  * Sticker Corner – view inside the picker (search, favorites, grid, preview at the bottom).
  */
 
+import * as DataStore from "@api/DataStore";
 import { classNameFactory } from "@utils/css";
 import { Channel } from "@vencord/discord-types";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "@webpack/common";
+import type { ReactNode } from "react";
 
 import { CategoryChip, categoriesOf, categoryLabel as catLabel, chipsFor } from "./categories";
 import { isBarHidden, setBarHidden } from "./fitsBar";
@@ -125,14 +127,72 @@ function GifTile({ gif, onSend }: { gif: GifItem; onSend(g: GifItem): void; }) {
     );
 }
 
-function Section({ title, stickers, ...handlers }: TileHandlers & { title: string; stickers: Sticker[]; }) {
+// Folding sections like Discord's emoji categories (remembered on this PC)
+const FOLD_KEY = "StickerCorner_folded";
+let folded = new Set<string>();
+const foldListeners = new Set<() => void>();
+DataStore.get<string[]>(FOLD_KEY).then(v => { if (v) { folded = new Set(v); foldListeners.forEach(l => l()); } });
+function useFolded(id: string): [boolean, () => void] {
+    const [, force] = useState(0);
+    useEffect(() => {
+        const l = () => force(n => n + 1);
+        foldListeners.add(l);
+        return () => void foldListeners.delete(l);
+    }, []);
+    const toggle = () => {
+        folded.has(id) ? folded.delete(id) : folded.add(id);
+        foldListeners.forEach(l => l());
+        DataStore.set(FOLD_KEY, [...folded]);
+    };
+    return [folded.has(id), toggle];
+}
+
+function FoldTitle({ id, children, extra }: { id: string; children: ReactNode; extra?: ReactNode; }) {
+    const [isFolded, toggle] = useFolded(id);
+    return (
+        <h3 className={cl("section-title", "section-title-fold")}>
+            <button className={cl("fold")} onClick={toggle} aria-expanded={!isFolded}>
+                <svg className={cl("fold-arrow", isFolded && "fold-arrow-closed")} width="12" height="12" viewBox="0 0 24 24" aria-hidden="true">
+                    <path fill="currentColor" d="M5.3 9.3a1 1 0 0 1 1.4 0L12 14.6l5.3-5.3a1 1 0 1 1 1.4 1.4l-6 6a1 1 0 0 1-1.4 0l-6-6a1 1 0 0 1 0-1.4Z" />
+                </svg>
+                {children}
+            </button>
+            {extra}
+        </h3>
+    );
+}
+
+function Section({ id, title, stickers, ...handlers }: TileHandlers & { id: string; title: string; stickers: Sticker[]; }) {
+    const [f] = useFolded(id);
+    const isFolded = !!id && f; // search results / a category never fold
     if (!stickers.length) return null;
     return (
         <section className={cl("section")}>
-            <h3 className={cl("section-title")}>{title}</h3>
-            <div className={cl("grid")}>
-                {stickers.map(s => <Tile key={s.id} sticker={s} {...handlers} />)}
-            </div>
+            {id ? <FoldTitle id={id}>{title}</FoldTitle> : <h3 className={cl("section-title")}>{title}</h3>}
+            {!isFolded && (
+                <div className={cl("grid")}>
+                    {stickers.map(s => <Tile key={s.id} sticker={s} {...handlers} />)}
+                </div>
+            )}
+        </section>
+    );
+}
+
+function FitsSection({ channelId, children }: { channelId: string; children: ReactNode; }) {
+    const [isFolded] = useFolded("fits");
+    return (
+        <section className={cl("section", "section-fits")}>
+            <FoldTitle
+                id="fits"
+                extra={isBarHidden(channelId) && (
+                    <button className={cl("fb-show")} onClick={() => setBarHidden(channelId, false)}>
+                        {lang() === "de" ? "über dem Chat zeigen" : "show above the chat"}
+                    </button>
+                )}
+            >
+                {t("fitsNow")}
+            </FoldTitle>
+            {!isFolded && <div className={cl("grid")}>{children}</div>}
         </section>
     );
 }
@@ -378,26 +438,16 @@ export function StickerCornerPanel({ channel, close }: Props) {
         body = (
             <>
                 {!narrowed && fits.length > 0 && (
-                    <section className={cl("section", "section-fits")}>
-                        <h3 className={cl("section-title")}>
-                            {t("fitsNow")}
-                            {isBarHidden(channel.id) && (
-                                <button className={cl("fb-show")} onClick={() => setBarHidden(channel.id, false)}>
-                                    {lang() === "de" ? "über dem Chat zeigen" : "show above the chat"}
-                                </button>
-                            )}
-                        </h3>
-                        <div className={cl("grid")}>
-                            {fits.map(f => f.sticker
-                                ? <Tile key={f.key} sticker={f.sticker} {...handlers} onSend={(st, e) => { usedFit.current = true; onSend(st, e); }} />
-                                : <GifTile key={f.key} gif={f.gif!} onSend={g => { usedFit.current = true; sendMessage(channel.id, { content: g.url }); close(); }} />)}
-                        </div>
-                    </section>
+                    <FitsSection channelId={channel.id}>
+                        {fits.map(f => f.sticker
+                            ? <Tile key={f.key} sticker={f.sticker} {...handlers} onSend={(st, e) => { usedFit.current = true; onSend(st, e); }} />
+                            : <GifTile key={f.key} gif={f.gif!} onSend={g => { usedFit.current = true; sendMessage(channel.id, { content: g.url }); close(); }} />)}
+                    </FitsSection>
                 )}
-                {!narrowed && <Section title={t("favorites", { n: favorites.length })} stickers={favorites} {...handlers} />}
-                {!narrowed && <Section title={t("recent")} stickers={recent} {...handlers} />}
-                {!narrowed && <Section title={t("popular")} stickers={popular} {...handlers} />}
-                <Section title={title} stickers={filtered} {...handlers} />
+                {!narrowed && <Section id="favorites" title={t("favorites", { n: favorites.length })} stickers={favorites} {...handlers} />}
+                {!narrowed && <Section id="recent" title={t("recent")} stickers={recent} {...handlers} />}
+                {!narrowed && <Section id="popular" title={t("popular")} stickers={popular} {...handlers} />}
+                <Section id={narrowed ? "" : "all"} title={title} stickers={filtered} {...handlers} />
             </>
         );
     }
