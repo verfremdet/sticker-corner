@@ -33,6 +33,7 @@ sticker channel ──(read-only bot)──► stickers.verfremdet.com ──►
   server, in `ticket-…` channels. A bar above the message box offers suggested replies (sent only when clicked), votes, a small team chat about the ticket and a ban
   button (only after a confirmation, messages are kept). Votes and chat are short messages in the team-only channel `#ticket-votes`.
   Everyone else never sees any of it.
+- **"Fits right now"**: suggestions learned only on your PC from the chat before you sent a sticker or GIF. Nothing of it leaves your computer.
 - It does not read your token, password or messages, and sends no data about you anywhere.
 - **Updates:** the update button pulls this repository with git and rebuilds Vencord. Nothing is downloaded from anywhere else.
 

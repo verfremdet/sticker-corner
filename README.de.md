@@ -33,6 +33,7 @@ Sticker-Channel ──(Bot, nur Lesen)──► stickers.verfremdet.com ──�
   Night-Corner-Servers, in `ticket-…`-Kanälen. Eine Leiste über dem Eingabefeld zeigt Antwort-Vorschläge (gesendet nur per Klick), einen kleinen Team-Chat zum Ticket,
   Abstimmungen und einen Bann-Knopf (nur nach Bestätigung, Nachrichten bleiben). Stimmen und Chat sind kurze Nachrichten im Team-Kanal
   `#ticket-votes`. Alle anderen sehen davon nichts.
+- **„Passt gerade“**: Vorschläge, die nur auf deinem PC aus dem Chat vor einem gesendeten Sticker oder GIF gelernt werden. Davon verlässt nichts deinen Computer.
 - Es liest weder deinen Token noch dein Passwort oder deine Nachrichten und schickt keine Daten über dich weg.
 - **Updates:** Der Update-Knopf holt dieses Repo per git und baut Vencord neu. Von anderswo wird nichts geladen.
 

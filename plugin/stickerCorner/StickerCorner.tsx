@@ -9,7 +9,10 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "@webpack/
 import { CategoryChip, categoriesOf, chipsFor } from "./categories";
 import { t } from "./i18n";
 import { openRenameModal } from "./contextMenu";
+import { sendMessage } from "@utils/discord";
+
 import { openMemeModal } from "./memeText";
+import { favoriteGifs, GifItem, markIgnored, suggest } from "./suggest";
 import { SlotMachine } from "./slots";
 import { canPost, myCount, myTop, prepareSticker, sendSticker, smallUrl, Sticker, toggleFavorite, useStickers, warmBlobs } from "./store";
 import { dismissWhatsNew, itemsOf, restartDiscord, runUpdate, useUpdate, useWhatsNew } from "./updater";
@@ -103,6 +106,19 @@ function Tile({ sticker, onSend, onHover, isFavorite, canEdit, onMeme }: TileHan
                     <StarIcon filled={fav} />
                 </button>
             </div>
+        </div>
+    );
+}
+
+function GifTile({ gif, onSend }: { gif: GifItem; onSend(g: GifItem): void; }) {
+    return (
+        <div className={cl("cell")}>
+            <button className={cl("tile", "tile-gif")} onClick={() => onSend(gif)} aria-label="GIF" title="GIF">
+                {gif.video
+                    ? <video src={gif.src} autoPlay loop muted playsInline />
+                    : <img src={gif.src} alt="GIF" loading="lazy" draggable={false} />}
+                <span className={cl("gif-badge")}>GIF</span>
+            </button>
         </div>
     );
 }
@@ -265,6 +281,16 @@ export function StickerCornerPanel({ channel, close }: Props) {
     const onMeme = (s: Sticker) => { openMemeModal(s, channel.id); close(); };
     const handlers: TileHandlers = { onSend, onHover, isFavorite, canEdit, onMeme };
     const [slotOpen, setSlotOpen] = useState(false);
+
+    // ✨ "Fits right now": learned per person from what you sent in similar chat moments
+    const fits = useMemo(
+        () => loaded && stickers.length ? suggest(channel.id, stickers, favoriteGifs(), myCount) : [],
+        [loaded, stickers.length > 0, channel.id]
+    );
+    const usedFit = useRef(false);
+    const fitsRef = useRef(fits);
+    fitsRef.current = fits;
+    useEffect(() => () => { if (!usedFit.current && fitsRef.current.length) markIgnored(fitsRef.current.map(f => f.key)); }, []);
     const top = myTop();
 
     // Always open at the top (favorites first). Favorites/recent load a moment later and
@@ -325,6 +351,16 @@ export function StickerCornerPanel({ channel, close }: Props) {
                 : t("all", { n: stickers.length });
         body = (
             <>
+                {!narrowed && fits.length > 0 && (
+                    <section className={cl("section", "section-fits")}>
+                        <h3 className={cl("section-title")}>{t("fitsNow")}</h3>
+                        <div className={cl("grid")}>
+                            {fits.map(f => f.sticker
+                                ? <Tile key={f.key} sticker={f.sticker} {...handlers} onSend={(st, e) => { usedFit.current = true; onSend(st, e); }} />
+                                : <GifTile key={f.key} gif={f.gif!} onSend={g => { usedFit.current = true; sendMessage(channel.id, { content: g.url }); close(); }} />)}
+                        </div>
+                    </section>
+                )}
                 {!narrowed && <Section title={t("favorites", { n: favorites.length })} stickers={favorites} {...handlers} />}
                 {!narrowed && <Section title={t("recent")} stickers={recent} {...handlers} />}
                 {!narrowed && <Section title={t("popular")} stickers={popular} {...handlers} />}

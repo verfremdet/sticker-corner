@@ -11,6 +11,7 @@ import { ChannelStore, Constants, FluxDispatcher, MessageActions, PendingReplySt
 
 import { t } from "./i18n";
 import { settings } from "./settings";
+import { learn } from "./suggest";
 
 export interface Sticker {
     id: string;
@@ -280,6 +281,7 @@ interface Prepared { at: number; upload: TCloudUpload | null; done: Promise<bool
  */
 export async function sendSticker(sticker: Sticker, channelId: string): Promise<boolean> {
     remember(sticker.id);
+    learn(channelId, `s:${sticker.id}`); // "Fits right now" learns: in this chat context I used this sticker
 
     const reply = PendingReplyStore.getPendingReply(channelId);
     if (reply) FluxDispatcher.dispatch({ type: "DELETE_PENDING_REPLY", channelId });

@@ -1421,3 +1421,36 @@
     object-fit: contain;
     flex: none;
 }
+
+/* ✨ Passt gerade */
+.vc-sc-section-fits .vc-sc-section-title {
+    background: linear-gradient(90deg, #a77bff, #f0b232);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+.vc-sc-tile-gif {
+    position: relative;
+    overflow: hidden;
+}
+
+.vc-sc-tile-gif video,
+.vc-sc-tile-gif img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 6px;
+}
+
+.vc-sc-gif-badge {
+    position: absolute;
+    left: 4px;
+    bottom: 4px;
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: rgb(0 0 0 / 65%);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 800;
+}

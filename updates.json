@@ -1,6 +1,18 @@
 {
-    "version": "1.8.0",
+    "version": "1.9.0",
     "news": [
+        {
+            "version": "1.9.0",
+            "date": "2026-11-09",
+            "items": {
+                "en": [
+                    "✨ Fits right now: stickers and your Discord GIFs that match the chat – learns from you, only on your PC"
+                ],
+                "de": [
+                    "✨ Passt gerade: Sticker und deine Discord-GIFs, die zum Chat passen – lernt von dir, nur auf deinem PC"
+                ]
+            }
+        },
         {
             "version": "1.8.0",
             "date": "2026-11-09",

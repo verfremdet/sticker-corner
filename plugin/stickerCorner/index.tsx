@@ -18,6 +18,7 @@ import { imageContextMenuPatch, messageContextMenuPatch } from "./contextMenu";
 import { t } from "./i18n";
 import { canReplyIn, replyWithSticker } from "./reply";
 import { settings } from "./settings";
+import { startSuggest, stopSuggest } from "./suggest";
 import { cl, StickerCornerPanel } from "./StickerCorner";
 import { start, stop } from "./store";
 import { startUpdater, stopUpdater } from "./updater";
@@ -135,10 +136,12 @@ export default definePlugin({
         start();
         startUpdater();
         startTickets();
+        startSuggest();
     },
     stop() {
         stop();
         stopUpdater();
         stopTickets();
+        stopSuggest();
     },
 });
