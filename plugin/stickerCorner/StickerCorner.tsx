@@ -4,11 +4,11 @@
 
 import { classNameFactory } from "@utils/css";
 import { Channel } from "@vencord/discord-types";
-import { useLayoutEffect, useMemo, useRef, useState } from "@webpack/common";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "@webpack/common";
 
 import { CategoryChip, categoriesOf, chipsFor } from "./categories";
 import { t } from "./i18n";
-import { sendSticker, smallUrl, Sticker, toggleFavorite, useStickers } from "./store";
+import { prepareSticker, sendSticker, smallUrl, Sticker, toggleFavorite, useStickers } from "./store";
 import { dismissWhatsNew, itemsOf, restartDiscord, runUpdate, useUpdate, useWhatsNew } from "./updater";
 import { VERSION } from "./version";
 
@@ -196,7 +196,16 @@ export function StickerCornerPanel({ channel, close }: Props) {
         if (!e.shiftKey) close();
     };
 
-    const handlers: TileHandlers = { onSend, onHover: setHovered, isFavorite };
+    // Resting on a sticker for a moment already uploads it → the click sends instantly
+    const prepTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+    const onHover = (s: Sticker | null) => {
+        setHovered(s);
+        clearTimeout(prepTimer.current);
+        if (s) prepTimer.current = setTimeout(() => prepareSticker(s, channel.id), 120);
+    };
+    useEffect(() => () => clearTimeout(prepTimer.current), []);
+
+    const handlers: TileHandlers = { onSend, onHover, isFavorite };
 
     // Always open at the top (favorites first). Favorites/recent load a moment later and
     // land above "All" – keep pinning to the top until the user scrolls themselves.
@@ -284,7 +293,7 @@ export function StickerCornerPanel({ channel, close }: Props) {
             <div
                 ref={scrollerRef}
                 className={cl("scroller")}
-                onMouseLeave={() => setHovered(null)}
+                onMouseLeave={() => onHover(null)}
                 onWheel={markScrolled}
                 onTouchMove={markScrolled}
                 onKeyDown={markScrolled}

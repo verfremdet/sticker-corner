@@ -144,30 +144,79 @@ export function toggleFavorite(id: string) {
 
 export const findSticker = (pred: (s: Sticker) => boolean) => stickers.find(pred);
 
-/** Loads the image and sends it to the channel as a normal image upload. */
+// ── fast sending ────────────────────────────────────────────────────────
+// Sending used to be: load image → upload to Discord → post message, all after the click.
+// Now the first two steps start as soon as the mouse rests on a sticker; the click only posts.
+const PREPARE_TTL = 20 * 60_000;
+const PREPARE_MAX = 8;
+const blobs = new Map<string, Promise<Blob>>();
+const prepared = new Map<string, { at: number; upload: Promise<Uploaded | null>; }>();
+
+const sendFileOf = (s: Sticker) => settings.store.sendSize === "original" ? s.file : s.sendFile ?? s.file;
+
+function loadBlob(fileName: string): Promise<Blob> {
+    let p = blobs.get(fileName);
+    if (!p) {
+        p = fetch(`${baseUrl()}/files/${fileName}`).then(r => {
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            return r.blob();
+        });
+        p.catch(() => blobs.delete(fileName));
+        blobs.set(fileName, p);
+    }
+    return p;
+}
+
+async function stickerFile(s: Sticker): Promise<File> {
+    const fileName = sendFileOf(s);
+    const blob = await loadBlob(fileName);
+    return new File([blob], `${safeFileName(s.name)}.${fileName.split(".").pop()}`, { type: blob.type });
+}
+
+/** Start loading + uploading in the background (hover/focus). Each upload is used once. */
+export function prepareSticker(s: Sticker, channelId: string) {
+    const key = `${channelId}:${sendFileOf(s)}`;
+    const now = Date.now();
+    for (const [k, v] of prepared) if (now - v.at > PREPARE_TTL) prepared.delete(k);
+    if (prepared.has(key)) return;
+    // keep only the newest few; older unused uploads simply expire on Discord's side
+    while (prepared.size >= PREPARE_MAX) prepared.delete(prepared.keys().next().value!);
+    const upload = stickerFile(s).then(f => cloudUpload(f, channelId, false)).catch(() => null);
+    prepared.set(key, { at: now, upload });
+}
+
+/** Sends the sticker as a normal image upload – instantly if it was prepared. */
 export async function sendSticker(sticker: Sticker, channelId: string): Promise<boolean> {
     remember(sticker.id);
 
-    const original = settings.store.sendSize === "original";
-    const fileName = original ? sticker.file : sticker.sendFile ?? sticker.file;
-
-    let blob: Blob;
-    try {
-        const res = await fetch(`${baseUrl()}/files/${fileName}`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        blob = await res.blob();
-    } catch {
-        showToast({ text: t("loadFailed"), variant: "critical" });
-        return false;
-    }
-
-    const ext = fileName.split(".").pop();
-    const file = new File([blob], `${safeFileName(sticker.name)}.${ext}`, { type: blob.type });
-
     const reply = PendingReplyStore.getPendingReply(channelId);
     if (reply) FluxDispatcher.dispatch({ type: "DELETE_PENDING_REPLY", channelId });
+    const ref = reply ? MessageActions.getSendMessageOptionsForReply(reply)?.messageReference : null;
 
-    const ok = await uploadFile(file, channelId, "", reply ? MessageActions.getSendMessageOptionsForReply(reply)?.messageReference : null);
+    const key = `${channelId}:${sendFileOf(sticker)}`;
+    const ready = prepared.get(key);
+    prepared.delete(key);
+
+    let up = ready && Date.now() - ready.at < PREPARE_TTL ? await ready.upload : null;
+    if (!up) {
+        let file: File;
+        try {
+            file = await stickerFile(sticker);
+        } catch {
+            showToast({ text: t("loadFailed"), variant: "critical" });
+            return false;
+        }
+        up = await cloudUpload(file, channelId);
+        if (!up) return false;
+    }
+
+    let ok = await postAttachment(channelId, up, "", ref, !ready);
+    if (!ok && !ready) return false;
+    // a prepared upload can expire on Discord's side → upload again once
+    if (!ok && ready) {
+        const fresh = await stickerFile(sticker).then(f => cloudUpload(f, channelId)).catch(() => null);
+        ok = !!fresh && await postAttachment(channelId, fresh, "", ref);
+    }
     if (ok) reportUse(sticker.id);
     return ok;
 }
@@ -179,37 +228,43 @@ function reportUse(id: string) {
     fetch(`${baseUrl()}/api/used/${id}`, { method: "POST", keepalive: true }).catch(() => { });
 }
 
-/** Uploads a file like Discord's own upload and posts it as a message. */
-function uploadFile(file: File, channelId: string, content: string, messageReference: unknown = null): Promise<boolean> {
+interface Uploaded { filename: string; uploadedFilename: string; }
+
+/** Uploads a file to Discord's storage, like Discord's own upload (not yet a message). */
+function cloudUpload(file: File, channelId: string, toastOnError = true): Promise<Uploaded | null> {
     return new Promise(resolve => {
         const upload = new CloudUpload({ file, isThumbnail: false, platform: CloudUploadPlatform.WEB }, channelId);
-        upload.on("complete", () => {
-            RestAPI.post({
-                url: Constants.Endpoints.MESSAGES(channelId),
-                body: {
-                    channel_id: channelId,
-                    content,
-                    nonce: SnowflakeUtils.fromTimestamp(Date.now()),
-                    sticker_ids: [],
-                    type: 0,
-                    attachments: [{
-                        id: "0",
-                        filename: upload.filename,
-                        uploaded_filename: upload.uploadedFilename,
-                    }],
-                    message_reference: messageReference,
-                },
-            }).then(() => resolve(true), () => {
-                showToast({ text: t("sendFailed"), variant: "critical" });
-                resolve(false);
-            });
-        });
+        upload.on("complete", () => resolve({ filename: upload.filename, uploadedFilename: upload.uploadedFilename! }));
         upload.on("error", () => {
-            showToast({ text: t("uploadFailed"), variant: "critical" });
-            resolve(false);
+            if (toastOnError) showToast({ text: t("uploadFailed"), variant: "critical" });
+            resolve(null);
         });
         upload.upload();
     });
+}
+
+/** Posts an uploaded file as a message */
+function postAttachment(channelId: string, up: Uploaded, content: string, messageReference: unknown = null, toastOnError = true): Promise<boolean> {
+    return RestAPI.post({
+        url: Constants.Endpoints.MESSAGES(channelId),
+        body: {
+            channel_id: channelId,
+            content,
+            nonce: SnowflakeUtils.fromTimestamp(Date.now()),
+            sticker_ids: [],
+            type: 0,
+            attachments: [{ id: "0", filename: up.filename, uploaded_filename: up.uploadedFilename }],
+            message_reference: messageReference,
+        },
+    }).then(() => true, () => {
+        if (toastOnError) showToast({ text: t("sendFailed"), variant: "critical" });
+        return false;
+    });
+}
+
+async function uploadFile(file: File, channelId: string, content: string): Promise<boolean> {
+    const up = await cloudUpload(file, channelId);
+    return !!up && postAttachment(channelId, up, content);
 }
 
 const Native = VencordNative.pluginHelpers.StickerCorner as PluginNative<typeof import("./native")>;

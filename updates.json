@@ -1,6 +1,18 @@
 {
-    "version": "1.4.0",
+    "version": "1.4.1",
     "news": [
+        {
+            "version": "1.4.1",
+            "date": "2026-11-09",
+            "items": {
+                "en": [
+                    "Stickers send almost instantly: they upload in the background while your mouse rests on them"
+                ],
+                "de": [
+                    "Sticker senden fast sofort: Sie laden im Hintergrund hoch, während die Maus darauf liegt"
+                ]
+            }
+        },
         {
             "version": "1.4.0",
             "date": "2026-11-09",

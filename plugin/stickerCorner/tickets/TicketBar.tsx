@@ -10,7 +10,7 @@ import { Channel } from "@vencord/discord-types";
 import { Alerts, GuildMemberStore, MessageStore, RestAPI, showToast, useEffect, useReducer, useState, UserStore, useStateFromStores } from "@webpack/common";
 
 import { lang } from "../i18n";
-import { findSticker, sendSticker } from "../store";
+import { findSticker, prepareSticker, sendSticker } from "../store";
 import { GATEKEEPERS, GREET_STICKER_RE, GREET_TEXT, GUILD_ID } from "./config";
 import { creatorOf, isApproved, isTeamMember, loadVotes, setText, subscribe, suggestions, tallyFor, toggleVote, voteChannel, VoteKind } from "./store";
 
@@ -114,6 +114,13 @@ export function TicketBar({ channel }: { channel: Channel; }) {
     const teamWrote = useStateFromStores([MessageStore], () =>
         ((MessageStore.getMessages(channel.id) as any)?._array as any[] ?? []).some(m => !m.author?.bot && isTeamMember(m.author.id))
     );
+
+    // Upload the greeting GIF ahead of time so the click sends instantly
+    useEffect(() => {
+        if (teamWrote) return;
+        const sticker = findSticker(s => GREET_STICKER_RE.test(s.name));
+        if (sticker) prepareSticker(sticker, channel.id);
+    }, [channel.id, teamWrote]);
 
     const tally = tallyFor(channel.id);
     const approved = isApproved(tally);
