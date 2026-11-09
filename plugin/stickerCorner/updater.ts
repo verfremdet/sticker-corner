@@ -49,7 +49,15 @@ export function isNewer(a: string, b: string) {
     return false;
 }
 
+let lastCheck = 0;
+
+/** Also check when the tab is opened, at most every 10 minutes – no restart needed to see updates */
+export function checkSoon() {
+    if (Date.now() - lastCheck > 10 * 60 * 1000) check();
+}
+
 async function check() {
+    lastCheck = Date.now();
     try {
         const res = await fetch(`${UPDATES_URL}?t=${Date.now()}`, { cache: "no-cache" });
         if (!res.ok) return;
@@ -124,6 +132,7 @@ export function useUpdate() {
     useEffect(() => {
         const l = () => force(n => n + 1);
         listeners.add(l);
+        checkSoon();
         return () => void listeners.delete(l);
     }, []);
     const available = latest != null && isNewer(latest, VERSION);
