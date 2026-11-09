@@ -1,6 +1,18 @@
 {
-    "version": "1.13.1",
+    "version": "1.13.2",
     "news": [
+        {
+            "version": "1.13.2",
+            "date": "2026-11-09",
+            "items": {
+                "en": [
+                    "Ticket profile: rules accepted = 🧠 smart, not accepted = 🤡 fucking dummy"
+                ],
+                "de": [
+                    "Ticket-Steckbrief: Regeln akzeptiert = 🧠 smart, nicht akzeptiert = 🤡 fucking dummy"
+                ]
+            }
+        },
         {
             "version": "1.13.1",
             "date": "2026-11-09",

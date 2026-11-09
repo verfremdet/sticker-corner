@@ -90,11 +90,11 @@ export function CreatorInfo({ channelId, creatorId }: { channelId: string; creat
                 className={cl("fact", rules === true ? "fact-good" : rules === false ? "fact-bad" : "fact-open")}
                 title={de() ? "Regeln akzeptiert = Rolle „maybe not hhaaattt stupid?“" : "Rules accepted = role “maybe not hhaaattt stupid?”"}
             >
-                📜 {rules === true
-                    ? (de() ? "Regeln akzeptiert" : "rules accepted")
+                {rules === true
+                    ? "🧠 smart"
                     : rules === false
-                        ? (de() ? "Regeln NICHT akzeptiert" : "rules NOT accepted")
-                        : (de() ? "Regeln: unbekannt" : "rules: unknown")}
+                        ? "🤡 fucking dummy"
+                        : (de() ? "📜 Regeln: unbekannt" : "📜 rules: unknown")}
             </span>
             <span className={cl("fact", `fact-${ageLevel}`)} title={age ? `${de() ? "Gefunden" : "Found"}: ${age.source}` : undefined}>
                 🎂 {ageText ?? (de() ? "Alter fehlt" : "no age yet")}{birthday ? " 🎉" : ""}
