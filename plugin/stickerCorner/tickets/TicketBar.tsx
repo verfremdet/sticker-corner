@@ -7,12 +7,12 @@
 import { classNameFactory } from "@utils/css";
 import { sendMessage } from "@utils/discord";
 import { Channel } from "@vencord/discord-types";
-import { Alerts, GuildMemberStore, MessageStore, RestAPI, showToast, useEffect, useReducer, useState, UserStore, useStateFromStores } from "@webpack/common";
+import { Alerts, GuildMemberStore, MessageStore, RestAPI, showToast, useEffect, useReducer, useRef, useState, UserStore, useStateFromStores } from "@webpack/common";
 
 import { lang } from "../i18n";
 import { findSticker, prepareSticker, sendSticker } from "../store";
 import { GATEKEEPERS, GREET_STICKER_RE, GREET_TEXT, GUILD_ID, VISIBLE_SUGGESTIONS } from "./config";
-import { creatorOf, isApproved, isTeamMember, loadVotes, setText, subscribe, suggestions, Tally, tallyFor, toggleVote, voteChannel, VoteKind } from "./store";
+import { chatFor, creatorOf, isApproved, isChatOpen, isTeamMember, loadVotes, markSeen, sendChat, setChatOpen, setText, subscribe, suggestions, Tally, tallyFor, toggleVote, unreadFor, voteChannel, VoteKind } from "./store";
 
 const cl = classNameFactory("vc-sct-");
 
@@ -25,6 +25,7 @@ const TEXT = {
         banned: "{name} banned", banFailed: "Ban failed: {e}", sendFailed: "Couldn't send",
         edit: "Edit for yourself", reset: "Back to default", noCreator: "Couldn't find who opened the ticket",
         stickerMissing: "Sticker “mhm…” not found in Sticker Corner",
+        chat: "Team", chatOpen: "Open team chat", chatClose: "Hide team chat", chatEmpty: "No messages yet – only the team sees this.", chatPlaceholder: "Message the team about this ticket …",
     },
     de: {
         ticket: "Ticket", greet: "GIF + mhm mhm", in: "Rein", out: "Raus", troll: "Troll", ban: "Bann",
@@ -34,6 +35,7 @@ const TEXT = {
         banned: "{name} gebannt", banFailed: "Bann fehlgeschlagen: {e}", sendFailed: "Senden fehlgeschlagen",
         edit: "Für dich bearbeiten", reset: "Zurück zum Standard", noCreator: "Ticket-Ersteller nicht gefunden",
         stickerMissing: "Sticker „mhm…“ in Sticker Corner nicht gefunden",
+        chat: "Team", chatOpen: "Team-Chat öffnen", chatClose: "Team-Chat einklappen", chatEmpty: "Noch nichts geschrieben – nur das Team sieht das.", chatPlaceholder: "Ans Team zu diesem Ticket schreiben …",
     },
 };
 type Key = keyof typeof TEXT.en;
@@ -143,6 +145,65 @@ function Voters({ tally }: { tally: Tally; }) {
     );
 }
 
+/** Team chat about this ticket – only the team sees it (messages live in #ticket-votes) */
+function TeamChat({ ticketId }: { ticketId: string; }) {
+    const msgs = chatFor(ticketId);
+    const [draft, setDraft] = useState("");
+    const [sending, setSending] = useState(false);
+    const listRef = useRef<HTMLDivElement>(null);
+    const me = UserStore.getCurrentUser()?.id;
+    const newest = msgs[msgs.length - 1]?.messageId;
+
+    // open = read: remember the newest message, keep the list scrolled to the bottom
+    useEffect(() => {
+        if (newest) markSeen(ticketId, newest);
+        const el = listRef.current;
+        if (el) el.scrollTop = el.scrollHeight;
+    }, [newest, ticketId]);
+
+    const submit = async () => {
+        if (!draft.trim() || sending) return;
+        setSending(true);
+        try {
+            if (await sendChat(ticketId, draft)) setDraft("");
+        } catch {
+            showToast({ text: tt("sendFailed"), variant: "critical" });
+        }
+        setSending(false);
+    };
+
+    return (
+        <div className={cl("chat")}>
+            <div className={cl("chat-list")} ref={listRef}>
+                {msgs.length === 0 && <div className={cl("chat-empty")}>{tt("chatEmpty")}</div>}
+                {msgs.map(m => (
+                    <div key={m.messageId} className={cl("chat-msg", m.userId === me && "chat-mine")}>
+                        <span className={cl("chat-author")}>{nameOf(m.userId)}</span>
+                        <span className={cl("chat-time")}>{timeOf(m.messageId)}</span>
+                        <div className={cl("chat-text")}>{m.text}</div>
+                    </div>
+                ))}
+            </div>
+            <input
+                className={cl("chat-input")}
+                value={draft}
+                maxLength={1800}
+                placeholder={tt("chatPlaceholder")}
+                onChange={e => setDraft(e.currentTarget.value)}
+                onKeyDown={e => {
+                    e.stopPropagation(); // keep Discord's own message box out of it
+                    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); }
+                }}
+            />
+        </div>
+    );
+}
+
+function timeOf(snowflake: string) {
+    const ms = Number(BigInt(snowflake) >> 22n) + 1420070400000;
+    return new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
 export function TicketBar({ channel }: { channel: Channel; }) {
     const [, rerender] = useReducer((n: number) => n + 1, 0);
     useEffect(() => { loadVotes(); return subscribe(rerender); }, []);
@@ -166,6 +227,8 @@ export function TicketBar({ channel }: { channel: Channel; }) {
     }, [channel.id, teamWrote]);
 
     const tally = tallyFor(channel.id);
+    const chatOpen = isChatOpen();
+    const unread = unreadFor(channel.id);
     const approved = isApproved(tally);
     const hasVoteChannel = !!voteChannel();
     const [busy, setBusy] = useState(false);
@@ -247,8 +310,20 @@ export function TicketBar({ channel }: { channel: Channel; }) {
                 ) : (
                     <span className={cl("hint")}>{tt("noVoteChannel")}</span>
                 )}
+                {hasVoteChannel && (
+                    <button
+                        className={cl("chat-toggle", chatOpen && "chat-toggle-open")}
+                        onClick={() => setChatOpen(!chatOpen)}
+                        title={chatOpen ? tt("chatClose") : tt("chatOpen")}
+                    >
+                        💬 {tt("chat")}
+                        {!chatOpen && unread > 0 && <span className={cl("badge")}>{unread}</span>}
+                    </button>
+                )}
                 <button className={cl("ban")} onClick={ban} disabled={!creatorId}>{tt("ban")}</button>
             </div>
+
+            {hasVoteChannel && chatOpen && <TeamChat ticketId={channel.id} />}
 
             {approved && <div className={cl("approved")}>{tt("approved")}</div>}
 

@@ -57,6 +57,56 @@ let loading: Promise<void> | null = null;
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach(l => l());
 
+// ── team chat per ticket: "<#ticket> 💬 text" in the same team channel ───
+export interface ChatMessage { messageId: string; userId: string; ticketId: string; text: string; }
+const CHAT_RE = /^<#(d{5,25})> 💬 ([sS]{1,1900})$/;
+let chats = new Map<string, ChatMessage>();
+
+function parseChat(m: { id: string; content?: string; author?: { id: string; }; }): ChatMessage | null {
+    const match = CHAT_RE.exec(m.content ?? "");
+    if (!match || !m.author || !isTeamMember(m.author.id)) return null;
+    return { messageId: m.id, userId: m.author.id, ticketId: match[1], text: match[2] };
+}
+
+const byId = (a: { messageId: string; }, b: { messageId: string; }) =>
+    a.messageId.length - b.messageId.length || (a.messageId < b.messageId ? -1 : 1);
+
+export const chatFor = (ticketId: string) => [...chats.values()].filter(c => c.ticketId === ticketId).sort(byId);
+
+export async function sendChat(ticketId: string, text: string): Promise<boolean> {
+    const ch = voteChannel();
+    const clean = text.trim().slice(0, 1800);
+    if (!ch || !clean) return false;
+    const res = await RestAPI.post({
+        url: Constants.Endpoints.MESSAGES(ch.id),
+        body: { content: `<#${ticketId}> 💬 ${clean}`, allowed_mentions: { parse: [] }, flags: 4096 /* silent */ },
+    });
+    const c = parseChat(res.body);
+    if (c) { chats.set(c.messageId, c); markSeen(ticketId, c.messageId); emit(); }
+    return true;
+}
+
+// unread badge: newest chat message I have seen per ticket
+const SEEN_KEY = "StickerCorner_ticketChatSeen";
+const OPEN_KEY = "StickerCorner_ticketChatOpen";
+let seen: Record<string, string> = {};
+let chatOpen = false;
+export const isChatOpen = () => chatOpen;
+export function setChatOpen(open: boolean) { chatOpen = open; DataStore.set(OPEN_KEY, open); emit(); }
+
+export function markSeen(ticketId: string, messageId: string) {
+    const cur = seen[ticketId];
+    if (cur && byId({ messageId: cur }, { messageId }) >= 0) return;
+    seen = { ...seen, [ticketId]: messageId };
+    DataStore.set(SEEN_KEY, seen);
+}
+
+export function unreadFor(ticketId: string): number {
+    const me = UserStore.getCurrentUser()?.id;
+    const last = seen[ticketId];
+    return chatFor(ticketId).filter(c => c.userId !== me && (!last || byId(c, { messageId: last }) > 0)).length;
+}
+
 function parse(m: { id: string; content?: string; author?: { id: string; }; }): Vote | null {
     const match = VOTE_RE.exec(m.content ?? "");
     if (!match || !m.author || !isTeamMember(m.author.id)) return null;
@@ -70,15 +120,20 @@ export function loadVotes(): Promise<void> {
     if (loadedFor === ch.id) return Promise.resolve();
     loading ??= (async () => {
         const next = new Map<string, Vote>();
+        const nextChats = new Map<string, ChatMessage>();
         let before: string | undefined;
         for (let page = 0; page < 3; page++) {
             const res = await RestAPI.get({ url: Constants.Endpoints.MESSAGES(ch.id), query: { limit: 100, ...(before ? { before } : {}) } });
             const batch = res.body as any[];
-            for (const m of batch) { const v = parse(m); if (v) next.set(v.messageId, v); }
+            for (const m of batch) {
+                const v = parse(m); if (v) next.set(v.messageId, v);
+                const c = parseChat(m); if (c) nextChats.set(c.messageId, c);
+            }
             if (batch.length < 100) break;
             before = batch[batch.length - 1].id;
         }
         votes = next;
+        chats = nextChats;
         loadedFor = ch.id;
         emit();
     })().catch(e => console.warn("[StickerCorner] votes:", e)).finally(() => { loading = null; });
@@ -89,14 +144,17 @@ function onCreate({ channelId, message }: any) {
     if (channelId !== loadedFor) return;
     const v = parse(message);
     if (v) { votes.set(v.messageId, v); emit(); }
+    const c = parseChat(message);
+    if (c) { chats.set(c.messageId, c); emit(); }
 }
 function onDelete({ channelId, id }: any) {
-    if (channelId === loadedFor && votes.delete(id)) emit();
+    if (channelId !== loadedFor) return;
+    if (votes.delete(id) || chats.delete(id)) emit();
 }
 function onDeleteBulk({ channelId, ids }: any) {
     if (channelId !== loadedFor) return;
     let changed = false;
-    for (const id of ids ?? []) changed = votes.delete(id) || changed;
+    for (const id of ids ?? []) changed = votes.delete(id) || chats.delete(id) || changed;
     if (changed) emit();
 }
 
@@ -105,6 +163,8 @@ export function startTickets() {
     FluxDispatcher.subscribe("MESSAGE_DELETE", onDelete);
     FluxDispatcher.subscribe("MESSAGE_DELETE_BULK", onDeleteBulk);
     loadTexts();
+    DataStore.get<Record<string, string>>(SEEN_KEY).then(v => { seen = v ?? {}; emit(); });
+    DataStore.get<boolean>(OPEN_KEY).then(v => { chatOpen = !!v; emit(); });
 }
 
 export function stopTickets() {

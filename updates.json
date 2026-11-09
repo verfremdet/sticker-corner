@@ -1,6 +1,18 @@
 {
-    "version": "1.5.2",
+    "version": "1.6.0",
     "news": [
+        {
+            "version": "1.6.0",
+            "date": "2026-11-09",
+            "items": {
+                "en": [
+                    "Team: chat about each ticket right in the ticket bar – fold it in or out, a red number shows new messages"
+                ],
+                "de": [
+                    "Team: Chat zu jedem Ticket direkt in der Ticket-Leiste – ein- und ausklappbar, eine rote Zahl zeigt neue Nachrichten"
+                ]
+            }
+        },
         {
             "version": "1.5.2",
             "date": "2026-11-09",

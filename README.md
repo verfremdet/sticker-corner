@@ -30,8 +30,8 @@ sticker channel ──(read-only bot)──► stickers.verfremdet.com ──►
   It loads that one image from Discord's own servers and posts it into the sticker channel with the name you typed
   ([`contextMenu.tsx`](plugin/stickerCorner/contextMenu.tsx)).
 - **Team ticket helper** ([`tickets/`](plugin/stickerCorner/tickets)): only for members with the team roles of the Night Corner
-  server, in `ticket-…` channels. A bar above the message box offers suggested replies (sent only when clicked), votes and a ban
-  button (only after a confirmation, messages are kept). Votes are short messages in the team-only channel `#ticket-votes`.
+  server, in `ticket-…` channels. A bar above the message box offers suggested replies (sent only when clicked), votes, a small team chat about the ticket and a ban
+  button (only after a confirmation, messages are kept). Votes and chat are short messages in the team-only channel `#ticket-votes`.
   Everyone else never sees any of it.
 - It does not read your token, password or messages, and sends no data about you anywhere.
 - **Updates:** the update button pulls this repository with git and rebuilds Vencord. Nothing is downloaded from anywhere else.
