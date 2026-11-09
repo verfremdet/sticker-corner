@@ -159,11 +159,14 @@ export class Store {
         const sendFile = await this.writeSmall(attachment.id, buf, fileExt);
 
         const baseName = stickerName(message, attachment);
+        const baseTags = parseReply(message.content).tags ?? [];
         this.stickers.set(attachment.id, {
             id: attachment.id,
             messageId: message.id,
             name: baseName,
             baseName,
+            tags: baseTags,
+            baseTags,
             file,
             sendFile,
             width,
@@ -217,6 +220,7 @@ export class Store {
             const s = this.stickers.get(id);
             if (!message.content?.trim()) continue;
             s.baseName = stickerName(message, { name: s.file });
+            s.baseTags = parseReply(message.content).tags ?? s.baseTags ?? [];
             touched = this.recomputeName(s) || touched;
         }
         if (touched) this.changed();
@@ -230,12 +234,18 @@ export class Store {
     nameByReply(targetMessageId, reply) {
         const ids = this.idsOfMessage(targetMessageId);
         if (!ids.length) return false;
-        const text = cleanText(reply.content);
+        // "sleepy cat #cats #funny" → name + categories; "#cats" alone only sets categories; "#-" clears them
+        const { text, tags } = parseReply(reply.content);
         let touched = false;
         for (const id of ids) {
             const s = this.stickers.get(id);
             s.names = (s.names ?? []).filter(n => n.id !== reply.id);
-            if (text) s.names.push({ id: reply.id, at: reply.createdTimestamp, text: text.slice(0, 60) });
+            if (text || tags) {
+                const entry = { id: reply.id, at: reply.createdTimestamp };
+                if (text) entry.text = text.slice(0, 60);
+                if (tags) entry.tags = tags;
+                s.names.push(entry);
+            }
             touched = this.recomputeName(s) || touched;
         }
         if (touched) this.changed();
@@ -268,12 +278,15 @@ export class Store {
         if (touched) this.changed();
     }
 
+    /** Name = newest reply with text, categories = newest reply with #tags (else from the original post) */
     recomputeName(s) {
         s.baseName ??= s.name;
-        const latest = (s.names ?? []).reduce((a, b) => (!a || b.at >= a.at ? b : a), null);
-        const name = latest?.text ?? s.baseName;
-        if (s.name === name) return false;
+        const newest = key => (s.names ?? []).filter(n => n[key] !== undefined).reduce((a, b) => (!a || b.at >= a.at ? b : a), null);
+        const name = newest("text")?.text ?? s.baseName;
+        const tags = newest("tags")?.tags ?? s.baseTags ?? [];
+        if (s.name === name && JSON.stringify(s.tags ?? []) === JSON.stringify(tags)) return false;
         s.name = name;
+        s.tags = tags;
         return true;
     }
 
@@ -313,8 +326,21 @@ export function cleanText(content) {
     return (content ?? "").replace(/<a?:\w+:\d+>|<@[!&]?\d+>|<#\d+>|https?:\/\/\S+/g, "").replace(/\s+/g, " ").trim();
 }
 
+const TAG_RE = /(^|\s)#([\p{L}\p{N}_-]{1,24})(?=\s|$)/gu;
+
+/** Splits "sleepy cat #cats #funny" into text and categories (lowercase, max. 8). "#-" = no categories. */
+export function parseReply(content) {
+    const raw = cleanText(content);
+    // "#1" is no category – a category needs a letter ("#-" is the special "none")
+    const found = [...raw.matchAll(TAG_RE)].map(m => m[2].toLowerCase()).filter(t => t === "-" || /\p{L}/u.test(t));
+    const text = raw.replace(TAG_RE, " ").replace(/\s+/g, " ").trim();
+    if (!found.length) return { text, tags: undefined };
+    const tags = found.includes("-") ? [] : [...new Set(found)].slice(0, 8);
+    return { text, tags };
+}
+
 function stickerName(message, attachment) {
-    const text = cleanText(message.content);
+    const text = parseReply(message.content).text;
     if (text) return text.slice(0, 60);
     return (attachment.name ?? "Sticker").replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").slice(0, 60);
 }

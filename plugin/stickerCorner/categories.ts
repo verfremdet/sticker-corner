@@ -5,7 +5,7 @@
  */
 
 import { lang } from "./i18n";
-import type { Sticker } from "./store";
+import { type Sticker, tagsOf } from "./store";
 
 interface Category {
     id: string;
@@ -65,8 +65,9 @@ function words(name: string): string[] {
     return out;
 }
 
+/** automatic categories from the name */
 const cache = new Map<string, string[]>();
-export function categoriesOf(s: Sticker): string[] {
+export function autoCategoriesOf(s: Sticker): string[] {
     let ids = cache.get(s.name);
     if (!ids) {
         const set = new Set<string>();
@@ -77,19 +78,42 @@ export function categoriesOf(s: Sticker): string[] {
     return ids;
 }
 
+/** "#katzen" / "#cats" → the built-in "cats"; anything else stays its own category "t:<tag>" */
+export function tagToCategory(tag: string): string {
+    const t = tag.toLowerCase();
+    const builtIn = CATEGORIES.find(c => c.id === t || c.en.toLowerCase() === t || c.de.toLowerCase() === t);
+    return builtIn ? builtIn.id : `t:${t}`;
+}
+
+/** all categories of a sticker: automatic + the ones people added (#tags) */
+export function categoriesOf(s: Sticker): string[] {
+    return [...new Set([...autoCategoriesOf(s), ...tagsOf(s).map(tagToCategory)])];
+}
+
+export function categoryLabel(id: string): string {
+    if (id.startsWith("t:")) return id.slice(2).charAt(0).toUpperCase() + id.slice(3);
+    const c = CATEGORIES.find(c => c.id === id);
+    return c ? (lang() === "de" ? c.de : c.en) : id;
+}
+
 export interface CategoryChip {
     id: string;
     label: string;
     count: number;
 }
 
-/** Categories with at least 2 stickers, biggest first */
+/** Built-in categories with at least 2 stickers + every category somebody added; biggest first */
 export function chipsFor(stickers: Sticker[]): CategoryChip[] {
     const counts = new Map<string, number>();
     for (const s of stickers) for (const id of categoriesOf(s)) counts.set(id, (counts.get(id) ?? 0) + 1);
-    const de = lang() === "de";
-    return CATEGORIES
-        .filter(c => (counts.get(c.id) ?? 0) >= 2)
-        .map(c => ({ id: c.id, label: de ? c.de : c.en, count: counts.get(c.id)! }))
+    return [...counts.entries()]
+        .filter(([id, n]) => id.startsWith("t:") ? n >= 1 : n >= 2)
+        .map(([id, count]) => ({ id, label: categoryLabel(id), count }))
         .sort((a, b) => b.count - a.count);
+}
+
+/** Choices for the editor: built-in categories + all added ones */
+export function categoryChoices(): { id: string; label: string; tag: string; }[] {
+    const de = lang() === "de";
+    return CATEGORIES.map(c => ({ id: c.id, label: de ? c.de : c.en, tag: (de ? c.de : c.en).toLowerCase() }));
 }

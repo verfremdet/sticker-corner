@@ -15,7 +15,9 @@ import { Confetti } from "./tickets/extras";
 const ROW = 76;            // height of one symbol
 const STRIP = 28;          // symbols per reel strip
 const STOP_AFTER = [1300, 1750, 2250]; // ms until reel 1/2/3 stops
-const POOL_SIZE = 7;
+
+/** The prize: the sticker that came up two or three times, otherwise the middle one */
+const prizeOf = (w: Sticker[]) => w.find(x => w.filter(y => y.id === x.id).length >= 2) ?? w[1];
 
 type Result = "none" | "pair" | "jackpot";
 
@@ -25,9 +27,22 @@ function pick<T>(list: T[]): T {
 
 /** Reel strips: random symbols, the winning one at index STRIP-2 (middle line when stopped) */
 function buildStrips(pool: Sticker[]): { strips: Sticker[][]; winners: Sticker[]; } {
-    // a little luck: 12 % jackpot, otherwise free random
-    const jackpot = Math.random() < 0.12 ? pick(pool) : null;
-    const winners = [0, 1, 2].map(() => jackpot ?? pick(pool));
+    // just for fun, so plenty of luck: 30 % three of a kind, 40 % two of a kind, otherwise three different
+    const r = Math.random();
+    const a = pick(pool);
+    let winners: Sticker[];
+    if (r < 0.3 || pool.length < 2) winners = [a, a, a];
+    else {
+        const others = pool.filter(s => s.id !== a.id);
+        const b = pick(others);
+        if (r < 0.7) {
+            winners = [a, a, b];
+            winners.sort(() => Math.random() - 0.5); // pair can be anywhere
+        } else {
+            const c = pick(others.filter(s => s.id !== b.id).length ? others.filter(s => s.id !== b.id) : others);
+            winners = [a, b, c];
+        }
+    }
     const strips = winners.map(w => {
         const s = Array.from({ length: STRIP }, () => pick(pool));
         s[STRIP - 2] = w;
@@ -43,10 +58,8 @@ export function SlotMachine({ stickers, favorites, channelId, onSend, onClose }:
     onSend(s: Sticker): void;
     onClose(): void;
 }) {
-    const [pool] = useState(() => {
-        const base = [...favorites, ...[...stickers].sort(() => Math.random() - 0.5)];
-        return [...new Map(base.map(s => [s.id, s])).values()].slice(0, POOL_SIZE);
-    });
+    // every sticker can come up (new ones too); favorites a little more often
+    const [pool] = useState(() => [...stickers, ...favorites]);
     const [{ strips, winners }, setSpin] = useState(() => buildStrips(pool));
     const [spinning, setSpinning] = useState(false);
     const [stopped, setStopped] = useState([true, true, true]);
@@ -73,7 +86,7 @@ export function SlotMachine({ stickers, favorites, channelId, onSend, onClose }:
         later(220, () => setLever(false));
 
         // the winner is known now → upload it already, so "send" is instant
-        prepareSticker(next.winners[1], channelId);
+        prepareSticker(prizeOf(next.winners), channelId);
 
         later(60, () => {
             setSpinning(true);
@@ -105,7 +118,7 @@ export function SlotMachine({ stickers, favorites, channelId, onSend, onClose }:
     // first spin right away – that's the fun part
     useEffect(() => { spin(); }, []);
 
-    const winner = winners[1];
+    const winner = prizeOf(winners);
     const resultText = result === "jackpot" ? t("slotJackpot") : result === "pair" ? t("slotPair") : result === "none" ? t("slotWin") : t("slotSpinning");
 
     return (

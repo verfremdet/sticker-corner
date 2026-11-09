@@ -27,6 +27,8 @@ export interface Sticker {
     messageId?: string;
     /** how often plugin users sent it (for "Popular") */
     uses?: number;
+    /** shared categories (#tags from replies in the sticker channel) */
+    tags?: string[];
 }
 
 /** Sticker channel – the server tells us; fallback for old servers */
@@ -83,6 +85,7 @@ export async function refresh() {
                     name: isJunkName(name) ? "" : name,
                     author: String(s.author ?? "").slice(0, 40),
                     uses: Number.isFinite(s.uses) ? Math.max(0, Number(s.uses)) : 0,
+                    tags: cleanTags(s.tags),
                     sendFile: typeof s.sendFile === "string" && SEND_FILE_RE.test(s.sendFile) ? s.sendFile : undefined,
                 };
             });
@@ -99,6 +102,7 @@ export async function start() {
     recent = await DataStore.get<string[]>(RECENT_KEY) ?? [];
     favorites = await DataStore.get<string[]>(FAV_KEY) ?? [];
     counts = await DataStore.get<Record<string, number>>(COUNT_KEY) ?? {};
+    localTags = await DataStore.get<Record<string, string[]>>(LOCAL_TAGS_KEY) ?? {};
     refresh();
     timer = setInterval(refresh, POLL_MS);
 }
@@ -170,29 +174,85 @@ export function canPost(): boolean {
 }
 
 /** Rename = reply to the image in the sticker channel; the server takes the newest reply as the name */
-export async function renameSticker(s: Sticker, name: string): Promise<boolean> {
-    const clean = name.trim().slice(0, 60);
-    if (!clean || !s.messageId || !/^\d{5,25}$/.test(s.messageId)) return false;
+// ── names & categories ──────────────────────────────────────────────────
+const TAG_OK = /^[\p{L}\p{N}_-]{1,24}$/u;
+export function cleanTags(raw: unknown): string[] {
+    if (!Array.isArray(raw)) return [];
+    return [...new Set(raw.map(t => String(t).toLowerCase().trim().replace(/^#/, "")).filter(t => TAG_OK.test(t) && /\p{L}/u.test(t)))].slice(0, 8);
+}
+
+/** Categories only for me (people without access to the sticker channel) */
+const LOCAL_TAGS_KEY = "StickerCorner_localTags";
+let localTags: Record<string, string[]> = {};
+
+/** shared + my own categories of a sticker */
+export const tagsOf = (s: Sticker): string[] => [...new Set([...(s.tags ?? []), ...(localTags[s.id] ?? [])])];
+
+/** every category somebody made, for the editor */
+export const allTags = (): string[] => [...new Set([...stickers.flatMap(s => s.tags ?? []), ...Object.values(localTags).flat()])].sort();
+
+/** silent reply to the image in the sticker channel → the server takes it as name and/or #categories */
+async function replyInChannel(s: Sticker, content: string): Promise<boolean> {
+    if (!s.messageId || !/^\d{5,25}$/.test(s.messageId)) return false;
     const channel = ChannelStore.getChannel(channelId);
+    await RestAPI.post({
+        url: Constants.Endpoints.MESSAGES(channelId),
+        body: {
+            content,
+            nonce: SnowflakeUtils.fromTimestamp(Date.now()),
+            message_reference: { message_id: s.messageId, channel_id: channelId, guild_id: channel?.guild_id },
+            allowed_mentions: { parse: [], replied_user: false },
+            flags: 4096, // silent
+        },
+    });
+    return true;
+}
+
+const tagLine = (tags: string[]) => tags.length ? tags.map(t => `#${t}`).join(" ") : "#-";
+const sameTags = (a: string[], b: string[]) => a.length === b.length && a.every(t => b.includes(t));
+
+/**
+ * Save name and categories. With access to the sticker channel: for everyone (one silent reply).
+ * Without: categories only for me, name stays.
+ */
+export async function editSticker(s: Sticker, name: string, tags: string[]): Promise<boolean> {
+    const cleanName = name.trim().slice(0, 60);
+    const newTags = cleanTags(tags);
+    if (!canPost()) {
+        localTags = { ...localTags, [s.id]: newTags.filter(t => !(s.tags ?? []).includes(t)) };
+        DataStore.set(LOCAL_TAGS_KEY, localTags);
+        emit();
+        return true;
+    }
+    const nameChanged = !!cleanName && cleanName !== s.name;
+    const tagsChanged = !sameTags(newTags, s.tags ?? []);
+    if (!nameChanged && !tagsChanged) return true;
+    const content = [nameChanged ? cleanName : "", tagsChanged ? tagLine(newTags) : ""].filter(Boolean).join(" ");
     try {
-        await RestAPI.post({
-            url: Constants.Endpoints.MESSAGES(channelId),
-            body: {
-                content: clean,
-                nonce: SnowflakeUtils.fromTimestamp(Date.now()),
-                message_reference: { message_id: s.messageId, channel_id: channelId, guild_id: channel?.guild_id },
-                allowed_mentions: { parse: [], replied_user: false },
-            },
-        });
+        await replyInChannel(s, content);
     } catch {
         showToast({ text: t("renameFailed"), variant: "critical" });
         return false;
     }
     // show it right away, the server confirms within seconds
-    s.name = clean;
+    if (nameChanged) s.name = cleanName;
+    if (tagsChanged) s.tags = newTags;
     emit();
     setTimeout(refresh, 3000);
     return true;
+}
+
+/** New category for several stickers at once */
+export async function addTagTo(list: Sticker[], tag: string): Promise<number> {
+    const [clean] = cleanTags([tag]);
+    if (!clean) return 0;
+    let done = 0;
+    for (const s of list) {
+        if (tagsOf(s).includes(clean)) continue;
+        if (await editSticker(s, s.name, [...(canPost() ? s.tags ?? [] : tagsOf(s)), clean])) done++;
+        if (canPost()) await new Promise(r => setTimeout(r, 350)); // gentle on Discord's rate limit
+    }
+    return done;
 }
 
 export const findSticker =(pred: (s: Sticker) => boolean) => stickers.find(pred);

@@ -6,9 +6,9 @@ import { classNameFactory } from "@utils/css";
 import { Channel } from "@vencord/discord-types";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "@webpack/common";
 
-import { CategoryChip, categoriesOf, chipsFor } from "./categories";
+import { CategoryChip, categoriesOf, categoryLabel as catLabel, chipsFor } from "./categories";
 import { t } from "./i18n";
-import { openRenameModal } from "./contextMenu";
+import { openEditModal, openNewCategoryModal } from "./editSticker";
 import { sendMessage } from "@utils/discord";
 
 import { openMemeModal } from "./memeText";
@@ -87,10 +87,11 @@ function Tile({ sticker, onSend, onHover, isFavorite, canEdit, onMeme }: TileHan
                 >
                     Aa
                 </button>
-                {canEdit && sticker.messageId && (
+                {(
+
                     <button
                         className={cl("action", "edit")}
-                        onClick={() => openRenameModal(sticker)}
+                        onClick={() => openEditModal(sticker)}
                         aria-label={t("rename")}
                         title={t("rename")}
                     >
@@ -186,8 +187,7 @@ function UpdateBanner() {
     );
 }
 
-function CategoryChips({ chips, active, onPick }: { chips: CategoryChip[]; active: string | null; onPick(id: string | null): void; }) {
-    if (!chips.length) return null;
+function CategoryChips({ chips, active, onPick, onAdd }: { chips: CategoryChip[]; active: string | null; onPick(id: string | null): void; onAdd(): void; }) {
     return (
         <div
             className={cl("chips")}
@@ -205,6 +205,7 @@ function CategoryChips({ chips, active, onPick }: { chips: CategoryChip[]; activ
                     {c.label}<span className={cl("chip-count")}>{c.count}</span>
                 </button>
             ))}
+            <button className={cl("chip", "chip-add")} onClick={onAdd} title={t("newCategory")} aria-label={t("newCategory")}>+</button>
         </div>
     );
 }
@@ -243,14 +244,17 @@ export function StickerCornerPanel({ channel, close }: Props) {
     const searchRef = useRef<HTMLInputElement>(null);
 
     const q = query.trim().toLowerCase();
-    const chips = useMemo(() => chipsFor(stickers), [stickers]);
+    // not memoized: categories can change in place (pencil) – cheap for a few hundred stickers
+    const chips = chipsFor(stickers);
     const activeCategory = chips.some(c => c.id === category) ? category : null;
-    const filtered = useMemo(() => {
-        let list = stickers;
-        if (activeCategory) list = list.filter(s => categoriesOf(s).includes(activeCategory));
-        if (q) list = list.filter(s => s.name.toLowerCase().includes(q) || s.author.toLowerCase().includes(q));
-        return list;
-    }, [stickers, q, activeCategory]);
+    // search also finds categories ("cats", "#katzen")
+    let filtered = stickers;
+    if (activeCategory) filtered = filtered.filter(s => categoriesOf(s).includes(activeCategory));
+    if (q) {
+        const qq = q.replace(/^#/, "");
+        filtered = filtered.filter(s => s.name.toLowerCase().includes(qq) || s.author.toLowerCase().includes(qq)
+            || categoriesOf(s).some(id => catLabel(id).toLowerCase().includes(qq)));
+    }
     const narrowed = !!q || !!activeCategory;
     const categoryLabel = chips.find(c => c.id === activeCategory)?.label;
 
@@ -386,7 +390,7 @@ export function StickerCornerPanel({ channel, close }: Props) {
                 </label>
                 <button className={cl("slot-open")} onClick={() => setSlotOpen(true)} title={t("slotOpen")} aria-label={t("slotOpen")}>🎰</button>
             </div>
-            <CategoryChips chips={chips} active={activeCategory} onPick={setCategory} />
+            <CategoryChips chips={chips} active={activeCategory} onPick={setCategory} onAdd={() => { openNewCategoryModal(stickers); close(); }} />
             <div
                 ref={scrollerRef}
                 className={cl("scroller")}

@@ -1,6 +1,24 @@
 {
-    "version": "1.9.0",
+    "version": "1.10.0",
     "news": [
+        {
+            "version": "1.10.0",
+            "date": "2026-11-09",
+            "items": {
+                "en": [
+                    "Everyone can add categories: “+” in the category bar, or the pencil on a sticker",
+                    "Pencil: edit name and categories together – for everyone if you can post in the sticker channel, otherwise just for you",
+                    "Search also finds categories",
+                    "🎰 Slots: all stickers on the reels, and much more luck (30 % three of a kind, 40 % two)"
+                ],
+                "de": [
+                    "Jeder kann Kategorien anlegen: „+“ in der Kategorie-Leiste oder der Bleistift am Sticker",
+                    "Bleistift: Name und Kategorien zusammen bearbeiten – für alle, wenn du in den Sticker-Channel posten darfst, sonst nur für dich",
+                    "Die Suche findet auch Kategorien",
+                    "🎰 Slots: alle Sticker auf den Walzen und viel mehr Glück (30 % drei gleiche, 40 % zwei)"
+                ]
+            }
+        },
         {
             "version": "1.9.0",
             "date": "2026-11-09",
