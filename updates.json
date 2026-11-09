@@ -1,6 +1,18 @@
 {
-    "version": "1.2.1",
+    "version": "1.2.2",
     "news": [
+        {
+            "version": "1.2.2",
+            "date": "2026-11-09",
+            "items": {
+                "en": [
+                    "Sticker Corner always opens at the top, with your favorites first"
+                ],
+                "de": [
+                    "Sticker Corner öffnet immer ganz oben, bei deinen Favoriten"
+                ]
+            }
+        },
         {
             "version": "1.2.1",
             "date": "2026-11-09",

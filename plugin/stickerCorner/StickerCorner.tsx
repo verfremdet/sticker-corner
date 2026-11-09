@@ -4,7 +4,7 @@
 
 import { classNameFactory } from "@utils/css";
 import { Channel } from "@vencord/discord-types";
-import { useMemo, useState } from "@webpack/common";
+import { useLayoutEffect, useMemo, useRef, useState } from "@webpack/common";
 
 import { t } from "./i18n";
 import { sendSticker, smallUrl, Sticker, toggleFavorite, useStickers } from "./store";
@@ -145,6 +145,18 @@ export function StickerCornerPanel({ channel, close }: Props) {
 
     const handlers: TileHandlers = { onSend, onHover: setHovered, isFavorite };
 
+    // Always open at the top (favorites first). Favorites/recent load a moment later and
+    // land above "All" – keep pinning to the top until the user scrolls themselves.
+    const scrollerRef = useRef<HTMLDivElement>(null);
+    const userScrolled = useRef(false);
+    useLayoutEffect(() => {
+        if (!userScrolled.current && scrollerRef.current) scrollerRef.current.scrollTop = 0;
+    }, [loaded, favorites.length, recent.length]);
+    useLayoutEffect(() => {
+        if (scrollerRef.current) scrollerRef.current.scrollTop = 0;
+    }, [q]);
+    const markScrolled = () => { userScrolled.current = true; };
+
     let body: React.ReactNode;
     if (!loaded) {
         body = <div className={cl("empty")}>{t("loading")}</div>;
@@ -179,7 +191,15 @@ export function StickerCornerPanel({ channel, close }: Props) {
                     />
                 </label>
             </div>
-            <div className={cl("scroller")} onMouseLeave={() => setHovered(null)}>
+            <div
+                ref={scrollerRef}
+                className={cl("scroller")}
+                onMouseLeave={() => setHovered(null)}
+                onWheel={markScrolled}
+                onTouchMove={markScrolled}
+                onKeyDown={markScrolled}
+                onMouseDown={markScrolled}
+            >
                 {body}
             </div>
             <div className={cl("footer")}>
