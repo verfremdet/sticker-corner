@@ -1,6 +1,18 @@
 {
-    "version": "1.5.0",
+    "version": "1.5.1",
     "news": [
+        {
+            "version": "1.5.1",
+            "date": "2026-11-09",
+            "items": {
+                "en": [
+                    "Fix: the update box no longer covers the whole window – only the newest news, older ones on request"
+                ],
+                "de": [
+                    "Fix: Die Update-Box verdeckt nicht mehr das ganze Fenster – nur die neuesten Neuigkeiten, ältere aufklappbar"
+                ]
+            }
+        },
         {
             "version": "1.5.0",
             "date": "2026-11-09",

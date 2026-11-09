@@ -126,6 +126,7 @@ function WhatsNewBanner() {
 
 function UpdateBanner() {
     const { available, latest, status, error, news } = useUpdate();
+    const [showAll, setShowAll] = useState(false);
     if (!available && status === "idle") return <WhatsNewBanner />;
 
     let action: React.ReactNode;
@@ -141,9 +142,17 @@ function UpdateBanner() {
             </div>
             {status === "error" && <div className={cl("update-error")}>{error}</div>}
             {status !== "done" && news.length > 0 && (
-                <ul className={cl("update-news")}>
-                    {news.flatMap(n => itemsOf(n).map((item, i) => <li key={n.version + i}>{item}</li>))}
-                </ul>
+                // only the newest version's news; older ones on request (otherwise the box gets taller than the picker)
+                <>
+                    <ul className={cl("update-news")}>
+                        {(showAll ? news : news.slice(0, 1)).flatMap(n => itemsOf(n).map((item, i) => <li key={n.version + i}>{item}</li>))}
+                    </ul>
+                    {news.length > 1 && (
+                        <button className={cl("update-more")} onClick={() => setShowAll(v => !v)}>
+                            {showAll ? t("less") : t("olderNews", { n: news.length - 1 })}
+                        </button>
+                    )}
+                </>
             )}
             {status === "done" && <div className={cl("update-hint")}>{t("restartHint")}</div>}
         </div>
