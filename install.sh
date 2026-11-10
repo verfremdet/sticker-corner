@@ -31,7 +31,11 @@ command -v pnpm >/dev/null || npm install -g pnpm || sudo npm install -g pnpm
 
 step 2 "$(L "Downloading / updating Vencord" "Vencord holen bzw. aktualisieren")"
 mkdir -p "$ROOT"
-if [ -d "$VENCORD/.git" ]; then git -C "$VENCORD" pull --ff-only
+if [ -d "$VENCORD/.git" ]; then
+    # This folder belongs to the installer: drop hand-made changes to Vencord's files, they block the pull.
+    # The plugin (src/userplugins) is untracked and stays.
+    git -C "$VENCORD" reset --hard -q
+    git -C "$VENCORD" pull --ff-only
 else git clone --depth 1 https://github.com/Vendicated/Vencord.git "$VENCORD"; fi
 
 step 3 "$(L "Adding the plugin" "Plugin einspielen")"

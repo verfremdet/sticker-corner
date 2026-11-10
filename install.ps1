@@ -56,6 +56,8 @@ function Install-StickerCorner {
     Step 2 (L "Downloading / updating Vencord" "Vencord holen bzw. aktualisieren")
     New-Item -ItemType Directory -Force $Root | Out-Null
     if (Test-Path (Join-Path $Vencord ".git")) {
+        # This folder belongs to the installer: drop hand-made changes to Vencord's files, they block the pull
+        git -C $Vencord reset --hard -q; Check "git reset Vencord"
         git -C $Vencord pull --ff-only; Check "git pull Vencord"
     } else {
         git clone --depth 1 https://github.com/Vendicated/Vencord.git $Vencord; Check "git clone Vencord"
