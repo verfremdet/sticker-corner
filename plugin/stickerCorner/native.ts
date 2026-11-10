@@ -9,6 +9,7 @@ import { CspPolicies, ImageSrc } from "@main/csp";
 import { execFile as cpExecFile } from "child_process";
 import { IpcMainInvokeEvent } from "electron";
 import { cp, rm, stat } from "fs/promises";
+import { homedir } from "os";
 import { join } from "path";
 import { promisify } from "util";
 
@@ -41,7 +42,31 @@ export async function fetchMedia(_: IpcMainInvokeEvent, url: string): Promise<{ 
 }
 
 const exists = (p: string) => stat(p).then(() => true, () => false);
-const git = (...args: string[]) => execFile("git", args, { cwd: REPO_DIR, windowsHide: true });
+
+/*
+ * macOS/Linux: Aus dem Dock gestartet kennt Discord nur /usr/bin:/bin – node aus Homebrew, nvm
+ * oder Volta wird dann nicht gefunden ("spawn node ENOENT"). Darum: PATH der Login-Shell holen
+ * und die üblichen Ordner anhängen.
+ */
+let toolEnv: Promise<NodeJS.ProcessEnv> | undefined;
+function getEnv() {
+    return toolEnv ??= (async () => {
+        if (process.platform === "win32") return process.env;
+        let shellPath = "";
+        try {
+            const { stdout } = await execFile(process.env.SHELL || "/bin/zsh",
+                ["-ilc", 'printf "\\n__SC__%s__SC__\\n" "$PATH"'], { timeout: 8000 });
+            shellPath = /__SC__(.*?)__SC__/.exec(stdout)?.[1] ?? "";
+        } catch { /* Shell antwortet nicht – die festen Ordner unten reichen meist */ }
+        const home = homedir();
+        const dirs = ["/opt/homebrew/bin", "/usr/local/bin", join(home, ".volta", "bin"), join(home, ".local", "bin"), "/usr/bin", "/bin"];
+        return { ...process.env, PATH: [shellPath, process.env.PATH, ...dirs].filter(Boolean).join(":") };
+    })();
+}
+
+const run = async (cmd: string, args: string[], cwd?: string) =>
+    execFile(cmd, args, { cwd, windowsHide: true, env: await getEnv(), maxBuffer: 16 * 1024 * 1024 });
+const git = (...args: string[]) => run("git", args, REPO_DIR);
 
 export async function update(_: IpcMainInvokeEvent): Promise<{ ok: boolean; error?: string; }> {
     try {
@@ -55,7 +80,7 @@ export async function update(_: IpcMainInvokeEvent): Promise<{ ok: boolean; erro
             await git("fetch", "--depth", "1", "origin", "main");
             await git("reset", "--hard", "origin/main");
         } else {
-            await execFile("git", ["clone", "--depth", "1", REPO, REPO_DIR], { windowsHide: true });
+            await run("git", ["clone", "--depth", "1", REPO, REPO_DIR]);
         }
 
         const source = join(REPO_DIR, "plugin", "stickerCorner");
@@ -66,11 +91,13 @@ export async function update(_: IpcMainInvokeEvent): Promise<{ ok: boolean; erro
         await cp(source, PLUGIN_DIR, { recursive: true });
 
         // 3. Vencord neu bauen (wie Vencords Updater)
-        const res = await execFile("node", ["scripts/build/build.mjs"], { cwd: VENCORD_DIR, windowsHide: true });
+        const res = await run("node", ["scripts/build/build.mjs"], VENCORD_DIR);
         if (res.stderr.includes("Build failed")) return { ok: false, error: "Bauen fehlgeschlagen" };
 
         return { ok: true };
     } catch (e: any) {
+        if (e?.code === "ENOENT")
+            return { ok: false, error: `„${e.path ?? "git/node"}“ wurde nicht gefunden. Bitte den Installationsbefehl nochmal ausführen.` };
         return { ok: false, error: String(e?.message ?? e).slice(0, 300) };
     }
 }

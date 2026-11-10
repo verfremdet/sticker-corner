@@ -1,6 +1,20 @@
 {
-    "version": "1.13.2",
+    "version": "1.13.3",
     "news": [
+        {
+            "version": "1.13.3",
+            "date": "2026-11-10",
+            "items": {
+                "en": [
+                    "Mac: the update button works when Discord was opened from the Dock (it did not find Node.js)",
+                    "Mac: the installer no longer stops with “operation not permitted” – run the install command once more to get this fix"
+                ],
+                "de": [
+                    "Mac: Der Update-Knopf geht jetzt auch, wenn Discord aus dem Dock gestartet wurde (Node.js wurde nicht gefunden)",
+                    "Mac: Der Installer bricht nicht mehr mit „operation not permitted“ ab – dafür einmal den Installationsbefehl neu ausführen"
+                ]
+            }
+        },
         {
             "version": "1.13.2",
             "date": "2026-11-09",
