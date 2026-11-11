@@ -3,6 +3,7 @@
 # Run it again to update.
 # Source and explanation: https://github.com/verfremdet/sticker-corner
 # Downloads only from: github.com (Vencord + this plugin), winget (Microsoft), npm (pnpm).
+# Without winget: git from github.com/git-for-windows and Node.js from nodejs.org instead.
 # Keep this file UTF-8 WITHOUT BOM: "irm | iex" would choke on a BOM.
 # From the ZIP, start install.cmd – it reads this file explicitly as UTF-8.
 
@@ -29,17 +30,82 @@ function Start-Discord {
     if (Test-Path $update) { Start-Process $update -ArgumentList "--processStart", "Discord.exe" }
 }
 
+function Has($cmd) { [bool](Get-Command $cmd -ErrorAction SilentlyContinue) }
+
+# winget is missing on some PCs (older Windows 10, LTSC, removed "App Installer").
+# Then git and Node.js are downloaded as plain ZIPs into the Sticker Corner folder – no admin rights needed.
+function Add-UserPath($dir) {
+    $user = [string][Environment]::GetEnvironmentVariable("Path", "User")
+    if (($user -split ";") -notcontains $dir) {
+        [Environment]::SetEnvironmentVariable("Path", ($user.TrimEnd(";") + ";" + $dir).TrimStart(";"), "User")
+    }
+    $env:Path = "$dir;$env:Path"
+}
+function Get-Zip($url, $dest) {
+    $zip = Join-Path $env:TEMP ("stickercorner-" + [IO.Path]::GetRandomFileName() + ".zip")
+    $old = $ProgressPreference; $ProgressPreference = "SilentlyContinue"  # the progress bar makes downloads 10x slower
+    try {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+        Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $zip -ErrorAction Stop
+        if (Test-Path $dest) { Remove-Item -Recurse -Force $dest }
+        Expand-Archive -Path $zip -DestinationPath $dest -Force -ErrorAction Stop
+    } finally {
+        $ProgressPreference = $old
+        Remove-Item -Force $zip -ErrorAction SilentlyContinue
+    }
+}
+function Get-Arch { if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64" -or $env:PROCESSOR_ARCHITEW6432 -eq "ARM64") { "arm64" } else { "x64" } }
+function Install-PortableGit($tools) {
+    # MinGit: the official small git from github.com/git-for-windows
+    $pattern = if ((Get-Arch) -eq "arm64") { '^MinGit-[\d.]+-arm64\.zip$' } else { '^MinGit-[\d.]+-64-bit\.zip$' }
+    $rel = Invoke-RestMethod -UseBasicParsing -Uri "https://api.github.com/repos/git-for-windows/git/releases/latest" -ErrorAction Stop
+    $asset = $rel.assets | Where-Object { $_.name -match $pattern } | Select-Object -First 1
+    if (-not $asset) { throw "MinGit not found in the latest git-for-windows release" }
+    $dest = Join-Path $tools "git"
+    Get-Zip $asset.browser_download_url $dest
+    Add-UserPath (Join-Path $dest "cmd")
+}
+function Install-PortableNode($tools) {
+    # Newest LTS from nodejs.org
+    # Two steps on purpose: Windows PowerShell 5.1 passes the JSON array down a pipe as ONE object
+    $all = Invoke-RestMethod -UseBasicParsing -Uri "https://nodejs.org/dist/index.json" -ErrorAction Stop
+    $lts = @($all) | Where-Object { $_.lts } | Select-Object -First 1
+    if (-not $lts) { throw "No Node.js LTS found on nodejs.org" }
+    $name = "node-$($lts.version)-win-$(Get-Arch)"
+    $tmp = Join-Path $tools "node-tmp"
+    Get-Zip "https://nodejs.org/dist/$($lts.version)/$name.zip" $tmp
+    $dest = Join-Path $tools "node"
+    if (Test-Path $dest) { Remove-Item -Recurse -Force $dest }
+    Move-Item (Join-Path $tmp $name) $dest
+    Remove-Item -Recurse -Force $tmp
+    Add-UserPath $dest
+}
+
 function Install-StickerCorner {
     Step 1 (L "Checking tools (git, Node.js, pnpm)" "Werkzeuge prüfen (git, Node.js, pnpm)")
-    if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+    $tools = Join-Path $Root "tools"
+    $winget = Has winget
+    if (-not (Has git)) {
         Write-Host (L "git is missing, installing it ..." "git fehlt, wird installiert ...")
-        winget install --id Git.Git -e --silent --accept-source-agreements --accept-package-agreements
-        Refresh-Path
+        if ($winget) {
+            winget install --id Git.Git -e --silent --accept-source-agreements --accept-package-agreements
+            Refresh-Path
+        }
+        if (-not (Has git)) {
+            Write-Host (L "Downloading git directly (about 40 MB) ..." "git wird direkt heruntergeladen (etwa 40 MB) ...")
+            Install-PortableGit $tools
+        }
     }
-    if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+    if (-not (Has node)) {
         Write-Host (L "Node.js is missing, installing it ..." "Node.js fehlt, wird installiert ...")
-        winget install --id OpenJS.NodeJS.LTS -e --silent --accept-source-agreements --accept-package-agreements
-        Refresh-Path
+        if ($winget) {
+            winget install --id OpenJS.NodeJS.LTS -e --silent --accept-source-agreements --accept-package-agreements
+            Refresh-Path
+        }
+        if (-not (Has node)) {
+            Write-Host (L "Downloading Node.js directly (about 35 MB, unpacking takes a minute) ..." "Node.js wird direkt heruntergeladen (etwa 35 MB, Entpacken dauert eine Minute) ...")
+            Install-PortableNode $tools
+        }
     }
     # npm.cmd / pnpm.cmd instead of npm / pnpm: PowerShell would pick npm.ps1 / pnpm.ps1,
     # which Windows blocks by default ("running scripts is disabled on this system").
@@ -51,6 +117,12 @@ function Install-StickerCorner {
     if (-not (Get-Command pnpm.cmd -ErrorAction SilentlyContinue)) {
         npm.cmd install -g pnpm | Out-Null; Check "npm install -g pnpm"
         Refresh-Path
+        # npm's global folder is not always on the PATH (fresh or portable Node.js)
+        if (-not (Has pnpm.cmd)) {
+            $prefix = (npm.cmd prefix -g | Select-Object -Last 1)
+            if ($prefix -and (Test-Path (Join-Path $prefix "pnpm.cmd"))) { Add-UserPath "$prefix".Trim() }
+        }
+        if (-not (Has pnpm.cmd)) { throw (L "pnpm could not be installed." "pnpm konnte nicht installiert werden.") }
     }
 
     Step 2 (L "Downloading / updating Vencord" "Vencord holen bzw. aktualisieren")

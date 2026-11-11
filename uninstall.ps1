@@ -19,6 +19,11 @@ if (Test-Path (Join-Path $Vencord "package.json")) {
 }
 if (Test-Path $Root) { Remove-Item -Recurse -Force $Root }
 
+# Remove the PATH entries the installer added for its own git / Node.js (only if winget was missing)
+$user = [string][Environment]::GetEnvironmentVariable("Path", "User")
+$kept = ($user -split ";" | Where-Object { $_ -and -not $_.StartsWith($Root, [StringComparison]::OrdinalIgnoreCase) }) -join ";"
+if ($kept -ne $user.Trim(";")) { [Environment]::SetEnvironmentVariable("Path", $kept, "User") }
+
 $update = Join-Path $env:LOCALAPPDATA "Discord\Update.exe"
 if (Test-Path $update) { Start-Process $update -ArgumentList "--processStart", "Discord.exe" }
 
