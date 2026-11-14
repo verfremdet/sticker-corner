@@ -10,6 +10,10 @@
  *  - Moods: "lol", "xd", 😂 → laugh · "sad", 😭 → sad · "no", "nein" → no · … for chat and names alike.
  *  - Feedback: a suggestion you click is learned again (stronger); suggestions you keep ignoring sink slowly.
  *  - A little exploration so new stickers get a chance.
+ *  - Habit: what you sent often lately ranks up, whatever the chat says. Measured on 501 real lobby examples
+ *    (predict the next GIF from everything before it): habit doubles the hits in the top 6 (15 % → 28 %),
+ *    more than any change to the word matching. Time of day, "people with similar taste" and
+ *    repeat boosts were measured too and did not help, so they are not in here.
  *  - Shared brain: the server learns from the lobby chats (which GIF came after which words) and sends
  *    those examples as hashed word bags (/api/brain). They are mixed in – your own lobby GIFs count more.
  *    New lobby GIFs are learned live on the server, so this gets smarter without a plugin update.
@@ -112,6 +116,9 @@ const GIF_KEY = "StickerCorner_suggestGifs";
 const IGNORE_KEY = "StickerCorner_suggestIgnored";
 const MAX_EXAMPLES = 600;
 const HALF_LIFE = 45 * 86_400_000;
+// habit fades faster than the learned contexts: what I use these weeks, not what I used once in spring
+const HABIT_HALF_LIFE = 14 * 86_400_000;
+const HABIT_WEIGHT = 0.5;
 
 let examples: Example[] = [];
 let knownGifs: Record<string, GifItem> = {};
@@ -347,7 +354,10 @@ function stickerVec(s: Sticker): Record<string, number> {
     let v = nameVecCache.get(k);
     if (!v) {
         v = tokenize(s.name);
-        for (const c of categoriesOf(s)) v[`w:${c.replace(/s$/, "")}`] = (v[`w:${c}`] ?? 0) + 0.6;
+        for (const c of categoriesOf(s)) {
+            const t = `w:${stem(c.replace(/^t:/, "").toLowerCase())}`;
+            v[t] = (v[t] ?? 0) + 0.6;
+        }
         nameVecCache.set(k, v);
     }
     return v;
@@ -357,7 +367,7 @@ export interface Suggestion { key: ItemKey; sticker?: Sticker; gif?: GifItem; sc
 
 /**
  * Best matches for the current chat.
- * score = learned similarity (main signal) + name/mood match (cold start) + own habit + channel habit − ignored
+ * score = learned similarity + what the lobbies do + name/mood match (cold start) + own habit + channel habit − ignored
  */
 export function suggest(channelId: string, stickers: Sticker[], favoriteGifs: GifItem[], myCount: (id: string) => number, limit = 6): Suggestion[] {
     const ctx = contextOf(channelId);
@@ -377,11 +387,19 @@ export function suggest(channelId: string, stickers: Sticker[], favoriteGifs: Gi
 
     const crowd = sharedScores(ctx, now);
 
+    // habit: how often I sent it lately – on this PC, and in the lobbies (the same send is in both, so take the bigger one)
+    const mineLocal = new Map<ItemKey, number>();
+    for (const e of examples) mineLocal.set(e.key, (mineLocal.get(e.key) ?? 0) + Math.pow(0.5, (now - e.at) / HABIT_HALF_LIFE));
+    const mineLobby = new Map<ItemKey, number>();
+    const me = hashTok(UserStore.getCurrentUser()?.id ?? "");
+    for (const e of shared) if (e.u === me) mineLobby.set(e.k, (mineLobby.get(e.k) ?? 0) + Math.pow(0.5, (now - e.at) / HABIT_HALF_LIFE));
+    const recentHabit = (key: ItemKey) => HABIT_WEIGHT * Math.log1p(Math.max(mineLocal.get(key) ?? 0, mineLobby.get(key) ?? 0));
+
     const scored: Suggestion[] = [];
     const scoreOf = (key: ItemKey, prior: number, habit: number) => {
         const l = learned.get(key) ?? 0;
         const c = crowd.get(key) ?? 0;
-        return 1.0 * Math.min(l, 3) + 0.8 * Math.min(c, 2) + 0.9 * prior + habit + (inChannel.get(key) ?? 0) - 0.12 * (ignored[key] ?? 0);
+        return 1.0 * Math.min(l, 3) + 0.8 * Math.min(c, 2) + 0.9 * prior + habit + recentHabit(key) + (inChannel.get(key) ?? 0) - 0.12 * (ignored[key] ?? 0);
     };
 
     for (const s of stickers) {

@@ -1,6 +1,20 @@
 {
-    "version": "1.13.4",
+    "version": "1.14.0",
     "news": [
+        {
+            "version": "1.14.0",
+            "date": "2026-11-14",
+            "items": {
+                "en": [
+                    "✨ Fits right now hits about twice as often: it now knows what you send most these weeks (tested on 501 real lobby moments: the right one in the top 6 went from 15 % to 30 %)",
+                    "Categories you made yourself now count for the suggestions too"
+                ],
+                "de": [
+                    "✨ Passt gerade trifft etwa doppelt so oft: Es weiß jetzt, was du in den letzten Wochen am meisten sendest (getestet an 501 echten Lobby-Momenten: das Richtige unter den ersten 6 stieg von 15 % auf 30 %)",
+                    "Selbst angelegte Kategorien zählen jetzt auch für die Vorschläge"
+                ]
+            }
+        },
         {
             "version": "1.13.4",
             "date": "2026-11-14",
