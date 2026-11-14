@@ -1,6 +1,18 @@
 {
-    "version": "1.13.3",
+    "version": "1.13.4",
     "news": [
+        {
+            "version": "1.13.4",
+            "date": "2026-11-14",
+            "items": {
+                "en": [
+                    "Scrollbars now use the colours of Discord and of your theme instead of a white bar"
+                ],
+                "de": [
+                    "Scrollleisten nehmen jetzt die Farben von Discord und deinem Theme statt einer weißen Leiste"
+                ]
+            }
+        },
         {
             "version": "1.13.3",
             "date": "2026-11-10",

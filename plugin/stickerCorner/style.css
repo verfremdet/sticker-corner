@@ -7,6 +7,16 @@
     --vc-sc-accent: #a77bff;
 }
 
+/*
+ * Scrollleisten: Farben kommen von Discord (--scrollbar-thin-*), damit sie zu jedem Theme passen.
+ * scrollbar-color vererbt sich, also reicht es, sie auf allen eigenen Elementen zu setzen.
+ * Ohne scrollbar-color zeichnet Chromium die Systemleiste (weiß, mit Pfeilen).
+ */
+[class*="vc-sc-"],
+[class*="vc-sct-"] {
+    scrollbar-color: var(--scrollbar-thin-thumb, rgb(128 128 128 / 45%)) var(--scrollbar-thin-track, transparent);
+}
+
 .vc-sc-tab-label,
 .vc-sc-footer-brand {
     font-family: var(--vc-sc-font);
@@ -86,28 +96,6 @@
     overflow-anchor: none;
     padding: 0 8px 8px 16px;
     scrollbar-width: thin;
-    scrollbar-color: var(--scrollbar-thin-thumb, rgb(255 255 255 / 15%)) transparent;
-}
-
-.vc-sc-scroller:hover {
-    scrollbar-color: var(--vc-sc-accent) transparent;
-}
-
-.vc-sc-scroller::-webkit-scrollbar {
-    width: 6px;
-}
-
-.vc-sc-scroller::-webkit-scrollbar-button {
-    display: none;
-}
-
-.vc-sc-scroller::-webkit-scrollbar-thumb {
-    background: rgb(255 255 255 / 15%);
-    border-radius: 3px;
-}
-
-.vc-sc-scroller::-webkit-scrollbar-thumb:hover {
-    background: var(--vc-sc-accent);
 }
 
 .vc-sc-section + .vc-sc-section {
@@ -773,7 +761,6 @@
     overflow-x: auto;
     padding: 2px;
     scrollbar-width: thin;
-    scrollbar-color: rgb(255 255 255 / 15%) transparent;
 }
 
 .vc-sct-greet {
@@ -912,7 +899,6 @@
     overflow-y: auto;
     padding-right: 4px;
     scrollbar-width: thin;
-    scrollbar-color: rgb(167 123 255 / 40%) transparent;
 }
 
 .vc-sct-chat-empty {
@@ -1522,6 +1508,7 @@
     gap: 6px;
     max-height: 320px;
     overflow-y: auto;
+    scrollbar-width: thin;
     padding: 2px;
 }
 
