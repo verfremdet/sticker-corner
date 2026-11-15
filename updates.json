@@ -1,6 +1,22 @@
 {
-    "version": "1.14.0",
+    "version": "1.15.0",
     "news": [
+        {
+            "version": "1.15.0",
+            "date": "2026-11-15",
+            "items": {
+                "en": [
+                    "✨ Fits right now really fits now: it understands far more of the chat (\"won\", \"lucky\", \"LETS GOOO\", work, tired, angry …) and shows what matches first",
+                    "Your usual stickers no longer fill the bar when they have nothing to do with the chat",
+                    "A sticker everyone sends all the time no longer wins every chat"
+                ],
+                "de": [
+                    "✨ Passt gerade passt jetzt wirklich: Es versteht viel mehr vom Chat („won“, „lucky“, „LETS GOOO“, Arbeit, müde, wütend …) und zeigt zuerst, was dazu passt",
+                    "Deine üblichen Sticker füllen die Leiste nicht mehr, wenn sie nichts mit dem Chat zu tun haben",
+                    "Ein Sticker, den alle ständig senden, gewinnt nicht mehr jeden Chat"
+                ]
+            }
+        },
         {
             "version": "1.14.0",
             "date": "2026-11-14",

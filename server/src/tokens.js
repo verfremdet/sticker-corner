@@ -8,20 +8,37 @@ const STOP = new Set(("a an the and or but so to of in on at for is are was were
     "nicht auch noch schon mal ja so wie was wer wo wann warum mit für bei den dem des").split(" "));
 
 const MOODS = {
-    laugh: ["lol", "lmao", "lmfao", "rofl", "xd", "haha", "hahaha", "hehe", "kek", "funny", "lustig", "witzig", "😂", "🤣", "💀", "😹", "joke", "joking", "clown", "🤡"],
-    sad: ["sad", "cry", "crying", "traurig", "heul", "sorry", "😭", "😢", "🥺", "😔", "miss", "rip", "depressed", "pain"],
-    love: ["love", "lieb", "liebe", "cute", "süß", "suess", "heart", "❤️", "❤", "🥰", "😍", "💕", "💖", "kiss", "babe", "baby", "kitten"],
-    angry: ["angry", "mad", "wütend", "wuetend", "hate", "hass", "stfu", "shut", "😡", "🤬", "😠", "grumpy", "annoying"],
-    hype: ["hype", "lets", "go", "goo", "gooo", "w", "win", "insane", "krass", "geil", "omg", "🔥", "🚀", "💯", "pog", "slay", "lock"],
-    no: ["no", "nope", "nah", "nein", "stop", "never", "niemals", "dont", "don't", "❌", "🚫"],
-    yes: ["yes", "yeah", "yep", "ok", "okay", "sure", "true", "facts", "real", "agreed", "genau", "stimmt", "✅", "👍", "mhm"],
-    shock: ["what", "wtf", "bruh", "omg", "huh", "excuse", "shock", "scream", "screaming", "😱", "😳", "😨", "🤯", "😮", "diagnosis"],
-    gay: ["gay", "twink", "homo", "🏳️‍🌈", "🌈", "slay", "queen"],
-    food: ["food", "hungry", "hunger", "eat", "essen", "pizza", "burger", "beer", "bier", "snack", "🍕", "🍔", "🍺", "tomato", "potato", "strawberry"],
-    sleep: ["sleep", "tired", "müde", "muede", "night", "nacht", "gn", "bed", "😴", "💤", "dreams", "dream"],
-    cringe: ["cringe", "awkward", "peinlich", "embarrassed", "😬", "🫠", "ew", "eww", "blushing"],
-    hello: ["hi", "hey", "hello", "hallo", "moin", "servus", "welcome", "willkommen", "👋", "yo", "sup"],
-    flirt: ["mamacita", "rizz", "flirt", "hot", "sexy", "😏", "😉", "woah", "daddy", "pretty"],
+    laugh: ["lol", "lmao", "lmfao", "rofl", "xd", "haha", "hahaha", "hehe", "kek", "funny", "lustig", "witzig", "😂", "🤣", "💀", "😹", "😆", "joke", "joking", "clown", "🤡",
+        "laugh", "laughing", "hilarious", "goofy", "silly", "meme", "lachen", "lache", "dead", "dying", "pointing", "comedy"],
+    sad: ["sad", "cry", "crying", "traurig", "heul", "sorry", "😭", "😢", "🥺", "😔", "😞", "😿", "💔", "miss", "rip", "depressed", "pain",
+        "sadge", "lonely", "alone", "hurt", "lost", "lose", "loss", "unlucky", "schade", "weinen", "tears", "ugh", "unfair", "failed", "fail"],
+    love: ["love", "lieb", "liebe", "cute", "süß", "suess", "heart", "❤️", "❤", "🥰", "😍", "💕", "💖", "💗", "💞", "😘", "🫶", "kiss", "babe", "baby", "kitten",
+        "adorable", "aww", "aw", "cutie", "sweet", "kawaii", "uwu", "hug", "wholesome", "precious", "couple", "blush", "ily", "🤗"],
+    angry: ["angry", "mad", "wütend", "wuetend", "hate", "hass", "stfu", "shut", "😡", "🤬", "😠", "🖕", "💢", "grumpy", "annoying",
+        "pissed", "fuck", "fucking", "bitch", "puta", "hater", "rage", "crash", "fight", "sauer", "nervt", "middle", "finger", "stupid", "idiot", "dumm", "hoe"],
+    hype: ["hype", "lets", "go", "goo", "gooo", "w", "win", "insane", "krass", "geil", "omg", "🔥", "🚀", "💯", "🎉", "🥳", "🏆", "💰", "🤑", "🙌", "💃", "🕺", "😎", "pog", "slay", "lock",
+        "won", "winner", "winning", "lucky", "luck", "raffle", "jackpot", "prize", "congrats", "congratulations", "gz", "gg", "ez", "easy", "yay", "woo", "woohoo",
+        "nice", "awesome", "amazing", "great", "epic", "goated", "fire", "banger", "party", "celebrate", "lessgo", "letsgo", "lfg", "leggo", "bet",
+        "gewonnen", "glück", "glueck", "stark", "mega", "dance", "dancing", "twerking", "jumping", "money", "free", "steal", "rich", "cinema", "kingdom", "alpha", "splits"],
+    no: ["no", "nope", "nah", "nein", "stop", "never", "niemals", "dont", "don't", "❌", "🚫", "🙅", "nuh", "cant", "can't", "refuse", "reverse", "denied", "nö"],
+    yes: ["yes", "yeah", "yep", "ok", "okay", "sure", "true", "facts", "real", "agreed", "genau", "stimmt", "✅", "👍", "👌", "mhm",
+        "yea", "ya", "yup", "yessir", "fr", "frfr", "right", "exactly", "valid", "based", "same", "jap", "klar", "honor"],
+    shock: ["what", "wtf", "bruh", "omg", "huh", "excuse", "shock", "scream", "screaming", "😱", "😳", "😨", "🤯", "😮", "😧", "👀", "diagnosis",
+        "wth", "omfg", "damn", "holy", "crazy", "wild", "creepy", "horror", "scary", "scared", "cursed", "staring", "stare", "alter", "digga", "unbelievable", "bunbelievable", "goodness"],
+    think: ["confused", "confusion", "hm", "hmm", "idk", "thinking", "think", "wait", "🤔", "🧐", "❓", "lore", "sus", "suspicious", "detection", "weird", "nerd", "🤓", "actually"],
+    gay: ["gay", "twink", "homo", "🏳️‍🌈", "🌈", "slay", "queen", "pride", "fruity", "zesty", "femboy"],
+    food: ["food", "hungry", "hunger", "eat", "essen", "pizza", "burger", "beer", "bier", "snack", "🍕", "🍔", "🍺", "tomato", "potato", "strawberry",
+        "cook", "cooking", "chef", "dinner", "lunch", "breakfast", "drink", "thirsty", "bottle", "lollipop", "pumpkin", "fridge"],
+    sleep: ["sleep", "tired", "müde", "muede", "night", "nacht", "gn", "bed", "😴", "💤", "🥱", "dreams", "dream", "sleepy", "asleep", "nap", "goodnight", "pennen", "schlafen", "exhausted"],
+    cringe: ["cringe", "awkward", "peinlich", "embarrassed", "😬", "🫠", "🤢", "🤮", "ew", "eww", "blushing", "shy", "hiding", "yikes", "nasty", "gross", "freaky"],
+    hello: ["hi", "hey", "hello", "hallo", "moin", "servus", "welcome", "willkommen", "👋", "yo", "sup", "wave", "waving", "bye", "cya", "goodbye", "gm", "morning", "tschüss", "ciao", "wb", "member"],
+    flirt: ["mamacita", "rizz", "flirt", "hot", "sexy", "😏", "😉", "😈", "🥵", "woah", "daddy", "pretty", "smirk", "smirking", "mommy", "handsome", "beautiful", "gorgeous", "maid"],
+    smoke: ["smoke", "smoking", "joint", "weed", "high", "zaza", "cigarette", "🚬", "🍃", "stoned", "kiffen", "blunt"],
+    work: ["work", "working", "job", "school", "boss", "monday", "arbeit", "schule", "lock", "focus", "study", "exam", "homework", "busy", "grind"],
+    pray: ["pray", "praying", "please", "pls", "plz", "hope", "hopefully", "beg", "bitte", "🙏", "amen", "god"],
+    game: ["game", "gaming", "play", "playing", "minecraft", "among", "sonic", "gamba", "gamble", "gambling", "casino", "slots", "zocken", "roblox", "valorant", "fortnite", "🎮", "🎰"],
+    meh: ["idc", "idgaf", "whatever", "boring", "bored", "meh", "egal", "life", "🙄", "😐", "😑", "serious"],
+    chaos: ["chaos", "unhinged", "feral", "shaking", "wobbly", "panic", "panicked", "help", "losing", "aaa", "aa"],
 };
 const MOOD_OF = new Map();
 for (const [mood, words] of Object.entries(MOODS)) for (const w of words) MOOD_OF.set(w, [...(MOOD_OF.get(w) ?? []), mood]);
@@ -41,6 +58,15 @@ function normalizeLaugh(w) {
     return w.replace(/(.)\1{2,}/g, "$1$1");
 }
 
+/** moods of a word, also for stretched spellings: "GGOOO" → go, "yesss" → yes, "heyy" → hey */
+function moodsOf(w, raw) {
+    const hit = MOOD_OF.get(w) ?? MOOD_OF.get(raw);
+    if (hit) return hit;
+    if (/(.)\1$/.test(w)) { const cut = MOOD_OF.get(w.slice(0, -1)); if (cut) return cut; }
+    if (/(.)\1\1/.test(raw)) return MOOD_OF.get(raw.replace(/(.)\1+/g, "$1")) ?? [];
+    return [];
+}
+
 export function tokenize(text, weight = 1, out = {}) {
     const add = (tok, w) => { out[tok] = (out[tok] ?? 0) + w * weight; };
     const lower = text.toLowerCase();
@@ -53,7 +79,7 @@ export function tokenize(text, weight = 1, out = {}) {
     for (const raw of plain.split(/[^\p{L}\p{N}']+/u)) {
         if (!raw) continue;
         const w = normalizeLaugh(raw.replace(/^'+|'+$/g, ""));
-        for (const mood of MOOD_OF.get(w) ?? MOOD_OF.get(raw) ?? []) add(`m:${mood}`, 1.4);
+        for (const mood of moodsOf(w, raw)) add(`m:${mood}`, 1.4);
         if (w.length < 2 || STOP.has(w)) continue;
         add(`w:${stem(w)}`, 1);
     }

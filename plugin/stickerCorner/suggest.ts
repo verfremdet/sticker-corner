@@ -10,10 +10,15 @@
  *  - Moods: "lol", "xd", 😂 → laugh · "sad", 😭 → sad · "no", "nein" → no · … for chat and names alike.
  *  - Feedback: a suggestion you click is learned again (stronger); suggestions you keep ignoring sink slowly.
  *  - A little exploration so new stickers get a chance.
- *  - Habit: what you sent often lately ranks up, whatever the chat says. Measured on 501 real lobby examples
- *    (predict the next GIF from everything before it): habit doubles the hits in the top 6 (15 % → 28 %),
- *    more than any change to the word matching. Time of day, "people with similar taste" and
- *    repeat boosts were measured too and did not help, so they are not in here.
+ *  - Fit first: an item needs a real match with THIS chat (learned moment, lobby moment or its name) to be shown.
+ *    Habit (what you sent often these weeks) multiplies that match; alone it only fills free places at the end.
+ *    1.14.0 added habit on top, which filled the bar with "my usual cats" whenever the chat words were unknown.
+ *  - Moods are a hand-made dictionary for chat AND names: "won", "lucky", "GGOOO" and a sticker called
+ *    "… dance" or "free money" all become "hype". Stretched spellings are folded ("yesss", "heyy").
+ *  - An item in 50 remembered moments must not win every chat: its sum is divided by the root of its hits.
+ *  - Measured on the real lobby examples (predict the next GIF from everything before it): top 6 stays at 27 %
+ *    with this order, 15 % without any habit. Time of day, "people with similar taste" and repeat boosts
+ *    were measured too and did not help, so they are not in here.
  *  - Shared brain: the server learns from the lobby chats (which GIF came after which words) and sends
  *    those examples as hashed word bags (/api/brain). They are mixed in – your own lobby GIFs count more.
  *    New lobby GIFs are learned live on the server, so this gets smarter without a plugin update.
@@ -33,20 +38,37 @@ const STOP = new Set(("a an the and or but so to of in on at for is are was were
     "nicht auch noch schon mal ja so wie was wer wo wann warum mit für bei den dem des").split(" "));
 
 const MOODS: Record<string, string[]> = {
-    laugh: ["lol", "lmao", "lmfao", "rofl", "xd", "haha", "hahaha", "hehe", "kek", "funny", "lustig", "witzig", "😂", "🤣", "💀", "😹", "joke", "joking", "clown", "🤡"],
-    sad: ["sad", "cry", "crying", "traurig", "heul", "sorry", "😭", "😢", "🥺", "😔", "miss", "rip", "depressed", "pain"],
-    love: ["love", "lieb", "liebe", "cute", "süß", "suess", "heart", "❤️", "❤", "🥰", "😍", "💕", "💖", "kiss", "babe", "baby", "kitten"],
-    angry: ["angry", "mad", "wütend", "wuetend", "hate", "hass", "stfu", "shut", "😡", "🤬", "😠", "grumpy", "annoying"],
-    hype: ["hype", "lets", "go", "goo", "gooo", "w", "win", "insane", "krass", "geil", "omg", "🔥", "🚀", "💯", "pog", "slay", "lock"],
-    no: ["no", "nope", "nah", "nein", "stop", "never", "niemals", "dont", "don't", "❌", "🚫"],
-    yes: ["yes", "yeah", "yep", "ok", "okay", "sure", "true", "facts", "real", "agreed", "genau", "stimmt", "✅", "👍", "mhm"],
-    shock: ["what", "wtf", "bruh", "omg", "huh", "excuse", "shock", "scream", "screaming", "😱", "😳", "😨", "🤯", "😮", "diagnosis"],
-    gay: ["gay", "twink", "homo", "🏳️‍🌈", "🌈", "slay", "queen"],
-    food: ["food", "hungry", "hunger", "eat", "essen", "pizza", "burger", "beer", "bier", "snack", "🍕", "🍔", "🍺", "tomato", "potato", "strawberry"],
-    sleep: ["sleep", "tired", "müde", "muede", "night", "nacht", "gn", "bed", "😴", "💤", "dreams", "dream"],
-    cringe: ["cringe", "awkward", "peinlich", "embarrassed", "😬", "🫠", "ew", "eww", "blushing"],
-    hello: ["hi", "hey", "hello", "hallo", "moin", "servus", "welcome", "willkommen", "👋", "yo", "sup"],
-    flirt: ["mamacita", "rizz", "flirt", "hot", "sexy", "😏", "😉", "woah", "daddy", "pretty"],
+    laugh: ["lol", "lmao", "lmfao", "rofl", "xd", "haha", "hahaha", "hehe", "kek", "funny", "lustig", "witzig", "😂", "🤣", "💀", "😹", "😆", "joke", "joking", "clown", "🤡",
+        "laugh", "laughing", "hilarious", "goofy", "silly", "meme", "lachen", "lache", "dead", "dying", "pointing", "comedy"],
+    sad: ["sad", "cry", "crying", "traurig", "heul", "sorry", "😭", "😢", "🥺", "😔", "😞", "😿", "💔", "miss", "rip", "depressed", "pain",
+        "sadge", "lonely", "alone", "hurt", "lost", "lose", "loss", "unlucky", "schade", "weinen", "tears", "ugh", "unfair", "failed", "fail"],
+    love: ["love", "lieb", "liebe", "cute", "süß", "suess", "heart", "❤️", "❤", "🥰", "😍", "💕", "💖", "💗", "💞", "😘", "🫶", "kiss", "babe", "baby", "kitten",
+        "adorable", "aww", "aw", "cutie", "sweet", "kawaii", "uwu", "hug", "wholesome", "precious", "couple", "blush", "ily", "🤗"],
+    angry: ["angry", "mad", "wütend", "wuetend", "hate", "hass", "stfu", "shut", "😡", "🤬", "😠", "🖕", "💢", "grumpy", "annoying",
+        "pissed", "fuck", "fucking", "bitch", "puta", "hater", "rage", "crash", "fight", "sauer", "nervt", "middle", "finger", "stupid", "idiot", "dumm", "hoe"],
+    hype: ["hype", "lets", "go", "goo", "gooo", "w", "win", "insane", "krass", "geil", "omg", "🔥", "🚀", "💯", "🎉", "🥳", "🏆", "💰", "🤑", "🙌", "💃", "🕺", "😎", "pog", "slay", "lock",
+        "won", "winner", "winning", "lucky", "luck", "raffle", "jackpot", "prize", "congrats", "congratulations", "gz", "gg", "ez", "easy", "yay", "woo", "woohoo",
+        "nice", "awesome", "amazing", "great", "epic", "goated", "fire", "banger", "party", "celebrate", "lessgo", "letsgo", "lfg", "leggo", "bet",
+        "gewonnen", "glück", "glueck", "stark", "mega", "dance", "dancing", "twerking", "jumping", "money", "free", "steal", "rich", "cinema", "kingdom", "alpha", "splits"],
+    no: ["no", "nope", "nah", "nein", "stop", "never", "niemals", "dont", "don't", "❌", "🚫", "🙅", "nuh", "cant", "can't", "refuse", "reverse", "denied", "nö"],
+    yes: ["yes", "yeah", "yep", "ok", "okay", "sure", "true", "facts", "real", "agreed", "genau", "stimmt", "✅", "👍", "👌", "mhm",
+        "yea", "ya", "yup", "yessir", "fr", "frfr", "right", "exactly", "valid", "based", "same", "jap", "klar", "honor"],
+    shock: ["what", "wtf", "bruh", "omg", "huh", "excuse", "shock", "scream", "screaming", "😱", "😳", "😨", "🤯", "😮", "😧", "👀", "diagnosis",
+        "wth", "omfg", "damn", "holy", "crazy", "wild", "creepy", "horror", "scary", "scared", "cursed", "staring", "stare", "alter", "digga", "unbelievable", "bunbelievable", "goodness"],
+    think: ["confused", "confusion", "hm", "hmm", "idk", "thinking", "think", "wait", "🤔", "🧐", "❓", "lore", "sus", "suspicious", "detection", "weird", "nerd", "🤓", "actually"],
+    gay: ["gay", "twink", "homo", "🏳️‍🌈", "🌈", "slay", "queen", "pride", "fruity", "zesty", "femboy"],
+    food: ["food", "hungry", "hunger", "eat", "essen", "pizza", "burger", "beer", "bier", "snack", "🍕", "🍔", "🍺", "tomato", "potato", "strawberry",
+        "cook", "cooking", "chef", "dinner", "lunch", "breakfast", "drink", "thirsty", "bottle", "lollipop", "pumpkin", "fridge"],
+    sleep: ["sleep", "tired", "müde", "muede", "night", "nacht", "gn", "bed", "😴", "💤", "🥱", "dreams", "dream", "sleepy", "asleep", "nap", "goodnight", "pennen", "schlafen", "exhausted"],
+    cringe: ["cringe", "awkward", "peinlich", "embarrassed", "😬", "🫠", "🤢", "🤮", "ew", "eww", "blushing", "shy", "hiding", "yikes", "nasty", "gross", "freaky"],
+    hello: ["hi", "hey", "hello", "hallo", "moin", "servus", "welcome", "willkommen", "👋", "yo", "sup", "wave", "waving", "bye", "cya", "goodbye", "gm", "morning", "tschüss", "ciao", "wb", "member"],
+    flirt: ["mamacita", "rizz", "flirt", "hot", "sexy", "😏", "😉", "😈", "🥵", "woah", "daddy", "pretty", "smirk", "smirking", "mommy", "handsome", "beautiful", "gorgeous", "maid"],
+    smoke: ["smoke", "smoking", "joint", "weed", "high", "zaza", "cigarette", "🚬", "🍃", "stoned", "kiffen", "blunt"],
+    work: ["work", "working", "job", "school", "boss", "monday", "arbeit", "schule", "lock", "focus", "study", "exam", "homework", "busy", "grind"],
+    pray: ["pray", "praying", "please", "pls", "plz", "hope", "hopefully", "beg", "bitte", "🙏", "amen", "god"],
+    game: ["game", "gaming", "play", "playing", "minecraft", "among", "sonic", "gamba", "gamble", "gambling", "casino", "slots", "zocken", "roblox", "valorant", "fortnite", "🎮", "🎰"],
+    meh: ["idc", "idgaf", "whatever", "boring", "bored", "meh", "egal", "life", "🙄", "😐", "😑", "serious"],
+    chaos: ["chaos", "unhinged", "feral", "shaking", "wobbly", "panic", "panicked", "help", "losing", "aaa", "aa"],
 };
 const MOOD_OF = new Map<string, string[]>();
 for (const [mood, words] of Object.entries(MOODS)) for (const w of words) MOOD_OF.set(w, [...(MOOD_OF.get(w) ?? []), mood]);
@@ -66,6 +88,15 @@ function normalizeLaugh(w: string): string {
     return w.replace(/(.)\1{2,}/g, "$1$1"); // "noooo" → "noo"
 }
 
+/** moods of a word, also for stretched spellings: "GGOOO" → go, "yesss" → yes, "heyy" → hey */
+function moodsOf(w: string, raw: string): string[] {
+    const hit = MOOD_OF.get(w) ?? MOOD_OF.get(raw);
+    if (hit) return hit;
+    if (/(.)\1$/.test(w)) { const cut = MOOD_OF.get(w.slice(0, -1)); if (cut) return cut; }
+    if (/(.)\1\1/.test(raw)) return MOOD_OF.get(raw.replace(/(.)\1+/g, "$1")) ?? [];
+    return [];
+}
+
 /** text → weighted tokens (words, emojis, moods) */
 export function tokenize(text: string, weight = 1, out: Record<string, number> = {}): Record<string, number> {
     const add = (tok: string, w: number) => { out[tok] = (out[tok] ?? 0) + w * weight; };
@@ -80,7 +111,7 @@ export function tokenize(text: string, weight = 1, out: Record<string, number> =
     for (const raw of plain.split(/[^\p{L}\p{N}']+/u)) {
         if (!raw) continue;
         const w = normalizeLaugh(raw.replace(/^'+|'+$/g, ""));
-        for (const mood of MOOD_OF.get(w) ?? MOOD_OF.get(raw) ?? []) add(`m:${mood}`, 1.4);
+        for (const mood of moodsOf(w, raw)) add(`m:${mood}`, 1.4);
         if (w.length < 2 || STOP.has(w)) continue;
         add(`w:${stem(w)}`, 1);
     }
@@ -119,6 +150,14 @@ const HALF_LIFE = 45 * 86_400_000;
 // habit fades faster than the learned contexts: what I use these weeks, not what I used once in spring
 const HABIT_HALF_LIFE = 14 * 86_400_000;
 const HABIT_WEIGHT = 0.5;
+// ranking: fit to the chat first (see suggest)
+const FIT_MIN = 0.3;        // below this an item does not "fit right now"
+const NAME_WEIGHT = 1.2;    // words/moods of the chat found in the sticker name
+const CROWD_WEIGHT = 0.8;   // what the lobbies sent in similar moments
+const HABIT_BOOST = 0.6;    // habit multiplies the fit instead of replacing it
+const UNKNOWN_WORD = 0.25;
+const POP_DAMP = 0.5;       // an item sent 50 times must not win every chat just by being in 50 examples
+const USUAL_UNTIL = 6;      // when less than this fits, the rest is filled with "what I send a lot these weeks"
 
 let examples: Example[] = [];
 let knownGifs: Record<string, GifItem> = {};
@@ -307,6 +346,7 @@ export function stopSuggest() {
 /** shared examples similar to the chat → key → score (own lobby GIFs count more) */
 function sharedScores(ctx: Record<string, number>, now: number): Map<ItemKey, number> {
     const out = new Map<ItemKey, number>();
+    const hits = new Map<ItemKey, number>();
     if (!shared.length) return out;
     const N = shared.length;
     const q: Record<string, number> = {};
@@ -329,7 +369,9 @@ function sharedScores(ctx: Record<string, number>, now: number): Map<ItemKey, nu
         if (sim <= 0.08) continue;
         const decay = Math.pow(0.5, (now - e.at) / BRAIN_HALF_LIFE);
         out.set(e.k, (out.get(e.k) ?? 0) + sim * decay * (e.u === me ? 1.3 : 0.6));
+        hits.set(e.k, (hits.get(e.k) ?? 0) + 1);
     }
+    for (const [k, v] of out) out.set(k, v / Math.pow(hits.get(k)!, POP_DAMP));
     return out;
 }
 
@@ -363,6 +405,13 @@ function stickerVec(s: Sticker): Record<string, number> {
     return v;
 }
 
+const gifVecCache = new Map<string, Record<string, number>>();
+function gifVec(url: string): Record<string, number> {
+    let v = gifVecCache.get(url);
+    if (!v) { v = tokenize(gifWords(url)); gifVecCache.set(url, v); }
+    return v;
+}
+
 export interface Suggestion { key: ItemKey; sticker?: Sticker; gif?: GifItem; score: number; }
 
 /**
@@ -376,14 +425,18 @@ export function suggest(channelId: string, stickers: Sticker[], favoriteGifs: Gi
     const now = Date.now();
 
     const learned = new Map<ItemKey, number>();
+    const learnedHits = new Map<ItemKey, number>();
     const inChannel = new Map<ItemKey, number>();
     for (const e of examples) {
         const sim = cosine(ctxW, tfidf(e.vec));
         if (sim <= 0.05) continue;
         const decay = Math.pow(0.5, (now - e.at) / HALF_LIFE);
         learned.set(e.key, (learned.get(e.key) ?? 0) + sim * decay);
+        learnedHits.set(e.key, (learnedHits.get(e.key) ?? 0) + 1);
         if (e.channelId === channelId) inChannel.set(e.key, (inChannel.get(e.key) ?? 0) + 0.15 * decay);
     }
+
+    for (const [k, v] of learned) learned.set(k, v / Math.pow(learnedHits.get(k)!, POP_DAMP));
 
     const crowd = sharedScores(ctx, now);
 
@@ -395,31 +448,42 @@ export function suggest(channelId: string, stickers: Sticker[], favoriteGifs: Gi
     for (const e of shared) if (e.u === me) mineLobby.set(e.k, (mineLobby.get(e.k) ?? 0) + Math.pow(0.5, (now - e.at) / HABIT_HALF_LIFE));
     const recentHabit = (key: ItemKey) => HABIT_WEIGHT * Math.log1p(Math.max(mineLocal.get(key) ?? 0, mineLobby.get(key) ?? 0));
 
-    const scored: Suggestion[] = [];
-    const scoreOf = (key: ItemKey, prior: number, habit: number) => {
-        const l = learned.get(key) ?? 0;
-        const c = crowd.get(key) ?? 0;
-        return 1.0 * Math.min(l, 3) + 0.8 * Math.min(c, 2) + 0.9 * prior + habit + recentHabit(key) + (inChannel.get(key) ?? 0) - 0.12 * (ignored[key] ?? 0);
+    // everything that can be suggested, with the words and moods of its name
+    const gifs = new Map<string, GifItem>([...Object.values(sharedGifs), ...Object.values(knownGifs), ...favoriteGifs].map(g => [g.url, g]));
+    const items: { key: ItemKey; sticker?: Sticker; gif?: GifItem; vec: Record<string, number>; habit: number; }[] = [];
+    for (const s of stickers) items.push({ key: `s:${s.id}`, sticker: s, vec: stickerVec(s), habit: 0.04 * Math.log1p(myCount(s.id)) });
+    for (const g of gifs.values()) items.push({ key: `g:${g.url}`, gif: g, vec: gifVec(g.url), habit: 0 });
+
+    // name match: chat words no name knows ("raffle", "skates") only count a quarter for the length of the chat,
+    // otherwise a long chat pushes every name match towards zero
+    const known = new Set<string>();
+    for (const it of items) for (const t in it.vec) known.add(t);
+    let cn = 0;
+    for (const [t, v] of Object.entries(ctx)) cn += v * v * (known.has(t) ? 1 : UNKNOWN_WORD);
+    cn = Math.sqrt(cn);
+    const nameMatch = (vec: Record<string, number>) => {
+        let dot = 0, n = 0;
+        for (const [t, v] of Object.entries(vec)) { n += v * v; if (ctx[t]) dot += v * ctx[t]; }
+        return dot && cn ? dot / (cn * Math.sqrt(n)) : 0;
     };
 
-    for (const s of stickers) {
-        const prior = cosine(ctx, stickerVec(s));
-        const habit = 0.04 * Math.log1p(myCount(s.id));
-        const key = `s:${s.id}`;
-        const score = scoreOf(key, prior, habit);
-        if (score > 0.12) scored.push({ key, sticker: s, score });
-    }
-
-    const gifs = new Map<string, GifItem>([...Object.values(sharedGifs), ...Object.values(knownGifs), ...favoriteGifs].map(g => [g.url, g]));
-    for (const g of gifs.values()) {
-        const prior = cosine(ctx, tokenize(gifWords(g.url)));
-        const key = `g:${g.url}`;
-        const score = scoreOf(key, prior, 0);
-        if (score > 0.12) scored.push({ key, gif: g, score });
+    // fit = how well it matches THIS chat. Habit only strengthens what fits; alone it does not get an item into the bar
+    // (before, the bar filled up with "what I always send" whenever the chat words were unknown).
+    const scored: Suggestion[] = [];
+    const usual: Suggestion[] = [];
+    for (const it of items) {
+        const fit = 1.0 * Math.min(learned.get(it.key) ?? 0, 3) + CROWD_WEIGHT * Math.min(crowd.get(it.key) ?? 0, 2) + NAME_WEIGHT * nameMatch(it.vec);
+        const habit = it.habit + recentHabit(it.key) + (inChannel.get(it.key) ?? 0);
+        const minus = 0.12 * (ignored[it.key] ?? 0);
+        if (fit >= FIT_MIN) scored.push({ key: it.key, sticker: it.sticker, gif: it.gif, score: fit * (1 + HABIT_BOOST * habit) - minus });
+        else if (habit - minus > 0.3) usual.push({ key: it.key, sticker: it.sticker, gif: it.gif, score: habit - minus });
     }
 
     scored.sort((a, b) => b.score - a.score);
+    usual.sort((a, b) => b.score - a.score);
+    // what fits comes first; only free places at the end go to "what I send a lot these weeks"
     const top = scored.slice(0, limit);
+    for (let i = 0; i < usual.length && top.length < Math.min(limit, USUAL_UNTIL); i++) top.push(usual[i]);
 
     // exploration: sometimes swap the last slot for a fitting-by-name sticker never used yet
     if (top.length >= 3 && Math.random() < 0.15) {
