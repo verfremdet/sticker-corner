@@ -26,8 +26,13 @@ export const settings = definePluginSettings({
     },
     autoSteal: {
         type: OptionType.BOOLEAN,
-        description: "Take your Discord favorite GIFs (and GIFs/stickers you send) into Sticker Corner by itself, never twice / Discord-Lieblings-GIFs (und gesendete GIFs/Sticker) von selbst in Sticker Corner übernehmen, nie doppelt",
+        description: "Take GIFs/stickers you send through Discord's pickers into Sticker Corner by itself, never twice / Über Discords Fenster gesendete GIFs/Sticker von selbst in Sticker Corner übernehmen, nie doppelt",
         default: true,
+    },
+    stealFavorites: {
+        type: OptionType.BOOLEAN,
+        description: "Also take your favorite GIFs from Discord's GIF picker (and make them favorites here) / Auch deine Lieblings-GIFs aus Discords GIF-Fenster übernehmen (und hier zu Favoriten machen)",
+        default: false,
     },
     sounds: {
         type: OptionType.BOOLEAN,

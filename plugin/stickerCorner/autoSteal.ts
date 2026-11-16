@@ -140,6 +140,7 @@ async function handle(job: Job) {
 
 /** all favorites from Discord's GIF picker (new ones are picked up every minute) */
 function checkFavorites() {
+    if (!settings.store.stealFavorites) return;
     for (const g of favoriteGifs()) {
         const media = isMediaFile(g.src) ? g.src : isMediaFile(g.url) ? g.url : "";
         if (!media) continue;

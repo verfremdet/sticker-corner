@@ -1,6 +1,18 @@
 {
-    "version": "1.16.0",
+    "version": "1.16.1",
     "news": [
+        {
+            "version": "1.16.1",
+            "date": "2026-11-16",
+            "items": {
+                "en": [
+                    "Favorite GIFs from Discord's GIF picker are no longer taken over by themselves for now – switch it on in the plugin settings (\"Also take your favorite GIFs\") if you want it"
+                ],
+                "de": [
+                    "Lieblings-GIFs aus Discords GIF-Fenster werden vorerst nicht mehr von selbst übernommen – wer das will, schaltet es in den Plugin-Einstellungen ein („Auch deine Lieblings-GIFs übernehmen“)"
+                ]
+            }
+        },
         {
             "version": "1.16.0",
             "date": "2026-11-15",
