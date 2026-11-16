@@ -20,6 +20,7 @@ import { t } from "./i18n";
 import { canReplyIn, replyWithSticker } from "./reply";
 import { settings } from "./settings";
 import { startSuggest, stopSuggest } from "./suggest";
+import { startAutoSteal, stopAutoSteal } from "./autoSteal";
 import { cl, StickerCornerPanel } from "./StickerCorner";
 import { start, stop } from "./store";
 import { startUpdater, stopUpdater } from "./updater";
@@ -143,11 +144,13 @@ export default definePlugin({
         startUpdater();
         startTickets();
         startSuggest();
+        startAutoSteal();
     },
     stop() {
         stop();
         stopUpdater();
         stopTickets();
         stopSuggest();
+        stopAutoSteal();
     },
 });

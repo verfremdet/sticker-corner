@@ -25,8 +25,8 @@ const VENCORD_DIR = join(__dirname, "..");
 const PLUGIN_DIR = join(VENCORD_DIR, "src", "userplugins", "stickerCorner");
 const REPO_DIR = join(VENCORD_DIR, "..", "sticker-corner");
 
-// „Zu Sticker Corner hinzufügen“: Bild aus Discord laden (nur Discord-/Tenor-Adressen, max. 10 MB)
-const MEDIA_HOSTS = /^(cdn\.discordapp\.com|media\.discordapp\.net|images-ext-\d+\.discordapp\.net|media\.tenor\.com)$/;
+// „Zu Sticker Corner hinzufügen“ und Auto-Klauen: Bild laden (nur Discord- und GIF-Anbieter-Adressen, max. 10 MB)
+const MEDIA_HOSTS = /^(cdn\.discordapp\.com|media\.discordapp\.net|images-ext-\d+\.discordapp\.net|media\.tenor\.com|c\.tenor\.com|static\.klipy\.com|media\d*\.giphy\.com|i\.giphy\.com)$/;
 const MEDIA_MAX = 10 * 1024 * 1024;
 
 export async function fetchMedia(_: IpcMainInvokeEvent, url: string): Promise<{ data?: Uint8Array; type?: string; error?: "host" | "size" | "http"; }> {

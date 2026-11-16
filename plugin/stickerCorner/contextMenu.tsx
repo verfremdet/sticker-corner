@@ -13,7 +13,7 @@ import { cl } from "./StickerCorner";
 import { addToCorner, canPost } from "./store";
 
 const MEDIA_RE = /\.(png|jpe?g|gif|webp|mp4|webm|mov)(?:$|\?)/i;
-const HOST_RE = /^https:\/\/(cdn\.discordapp\.com|media\.discordapp\.net|images-ext-\d+\.discordapp\.net|media\.tenor\.com)\//;
+const HOST_RE = /^https:\/\/(cdn\.discordapp\.com|media\.discordapp\.net|images-ext-\d+\.discordapp\.net|media\.tenor\.com|c\.tenor\.com|static\.klipy\.com|media\d*\.giphy\.com|i\.giphy\.com)\//;
 
 
 /** Name suggestion from the file name, unless it is a hash/"image0" */

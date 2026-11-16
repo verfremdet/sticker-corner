@@ -7,6 +7,7 @@ import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import sharp from "sharp";
+import { fingerprint, same } from "./fingerprint.js";
 
 const execFile = promisify(cpExecFile);
 
@@ -85,6 +86,8 @@ export class Store {
         this.jsonPath = path.join(dataDir, "stickers.json");
         /** @type {Map<string, any>} Schlüssel = Attachment-ID */
         this.stickers = new Map();
+        /** duplicate attachment id → id of the sticker it looks like (posted twice) */
+        this.dupes = {};
         this.version = 0;
         this.saveTimer = null;
     }
@@ -94,6 +97,7 @@ export class Store {
         try {
             const data = JSON.parse(await readFile(this.jsonPath, "utf8"));
             for (const s of data.stickers ?? []) this.stickers.set(s.id, s);
+            this.dupes = data.dupes ?? {};
             this.version = data.version ?? Date.now();
         } catch {
             this.version = Date.now();
@@ -102,7 +106,15 @@ export class Store {
 
     list() {
         const stickers = [...this.stickers.values()].sort((a, b) => b.createdAt - a.createdAt);
-        return { version: this.version, channelId: this.channelId, stickers };
+        const dupes = {};
+        for (const [id, to] of Object.entries(this.dupes)) if (this.stickers.has(to)) dupes[id] = to;
+        return { version: this.version, channelId: this.channelId, stickers, dupes };
+    }
+
+    /** sticker that looks exactly like this fingerprint, or null */
+    findSame(fp, exceptId) {
+        for (const s of this.stickers.values()) if (s.id !== exceptId && same(s.fp, fp)) return s;
+        return null;
     }
 
     has(id) {
@@ -117,6 +129,7 @@ export class Store {
     async add({ attachment, message }) {
         const ext = mediaExt(attachment);
         if (!ext || this.stickers.has(attachment.id)) return false;
+        if (this.stickers.has(this.dupes[attachment.id])) return false;
         const isVideo = VIDEO_EXTS.has(ext);
         if (isVideo && (attachment.size ?? 0) > VIDEO_MAX_DOWNLOAD) {
             console.log(`Video zu groß, übersprungen: ${attachment.name}`);
@@ -146,6 +159,17 @@ export class Store {
             fileExt = "webp";
         }
 
+        // same picture already in the corner (posted twice) → not a second sticker
+        let fp;
+        try { fp = await fingerprint(buf, false); } catch (e) { console.error(`Fingerabdruck ${attachment.id}:`, e.message); }
+        const twin = fp && this.findSame(fp);
+        if (twin) {
+            console.log(`= schon da (${twin.name}): ${attachment.name}`);
+            this.dupes[attachment.id] = twin.id;
+            this.changed();
+            return false;
+        }
+
         let width = isVideo ? 0 : attachment.width ?? 0;
         let height = isVideo ? 0 : attachment.height ?? 0;
         try {
@@ -172,6 +196,7 @@ export class Store {
             width,
             height,
             size: buf.length,
+            fp,
             author: message.member?.displayName ?? message.author?.globalName ?? message.author?.username ?? "",
             createdAt: message.createdTimestamp,
         });
@@ -194,6 +219,21 @@ export class Store {
         } catch (e) {
             console.error(`Kleine Version ${id}:`, e.message);
             return undefined;
+        }
+    }
+
+    /** Fingerabdruck für ältere Einträge nachziehen (für die Doppelt-Prüfung) */
+    async backfillFingerprints() {
+        let n = 0;
+        for (const s of this.stickers.values()) {
+            if (s.fp) continue;
+            const buf = await readFile(path.join(this.filesDir, s.file)).catch(() => null);
+            if (!buf) continue;
+            try { s.fp = await fingerprint(buf, false); n++; } catch (e) { console.error(`Fingerabdruck ${s.id}:`, e.message); }
+        }
+        if (n) {
+            console.log(`Fingerabdrücke nachgezogen: ${n}`);
+            this.changed();
         }
     }
 
@@ -303,6 +343,7 @@ export class Store {
         const s = this.stickers.get(id);
         if (!s) return;
         this.stickers.delete(id);
+        for (const [d, to] of Object.entries(this.dupes)) if (to === id || d === id) delete this.dupes[d];
         await rm(path.join(this.filesDir, s.file), { force: true });
         if (s.sendFile) await rm(path.join(this.filesDir, s.sendFile), { force: true });
         this.changed();

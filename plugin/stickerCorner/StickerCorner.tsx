@@ -15,7 +15,7 @@ import { openEditModal, openNewCategoryModal } from "./editSticker";
 import { sendMessage } from "@utils/discord";
 
 import { openMemeModal } from "./memeText";
-import { favoriteGifs, GifItem, markIgnored, suggest } from "./suggest";
+import { favoriteGifs, GifItem, markBroken, markIgnored, suggest } from "./suggest";
 import { SlotMachine } from "./slots";
 import { canPost, myCount, myTop, prepareSticker, sendSticker, smallUrl, Sticker, toggleFavorite, useStickers, warmBlobs } from "./store";
 import { dismissWhatsNew, itemsOf, restartDiscord, runUpdate, useUpdate, useWhatsNew } from "./updater";
@@ -115,12 +115,16 @@ function Tile({ sticker, onSend, onHover, isFavorite, canEdit, onMeme }: TileHan
 }
 
 function GifTile({ gif, onSend }: { gif: GifItem; onSend(g: GifItem): void; }) {
+    // picture does not load (link gone) → no empty tile
+    const [gone, setGone] = useState(false);
+    if (gone) return null;
+    const fail = () => { markBroken(gif.url); setGone(true); };
     return (
         <div className={cl("cell")}>
             <button className={cl("tile", "tile-gif")} onClick={() => onSend(gif)} aria-label="GIF" title="GIF">
                 {gif.video
-                    ? <video src={gif.src} autoPlay loop muted playsInline />
-                    : <img src={gif.src} alt="GIF" loading="lazy" draggable={false} />}
+                    ? <video src={gif.src} autoPlay loop muted playsInline onError={fail} />
+                    : <img src={gif.src} alt="GIF" loading="lazy" draggable={false} onError={fail} />}
                 <span className={cl("gif-badge")}>GIF</span>
             </button>
         </div>

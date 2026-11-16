@@ -12,7 +12,7 @@ import { lang, t } from "./i18n";
 import { settings } from "./settings";
 import { cl } from "./StickerCorner";
 import { myCount, prepareSticker, sendSticker, smallUrl, useStickers } from "./store";
-import { favoriteGifs, isCounterMoment, Suggestion, suggest } from "./suggest";
+import { favoriteGifs, isCounterMoment, markBroken, Suggestion, suggest } from "./suggest";
 import { sendMessage } from "@utils/discord";
 
 const KEY = "StickerCorner_fitsBar";
@@ -90,6 +90,12 @@ export function FitsBar({ channel }: { channel: Channel; }) {
 
     if (!settings.store.fitsBar || bar.hidden[channel.id] || !fits.length) return null;
 
+    // picture does not load (link gone) → drop the empty tile, think again without it
+    const dropGif = (f: Suggestion) => {
+        markBroken(f.gif!.url);
+        setFits(list => list.filter(x => x.key !== f.key));
+    };
+
     const send = (f: Suggestion) => {
         if (f.sticker) sendSticker(f.sticker, channel.id);
         else if (f.gif) sendMessage(channel.id, { content: f.gif.url });
@@ -141,8 +147,8 @@ export function FitsBar({ channel }: { channel: Channel; }) {
                             {f.sticker
                                 ? <img src={smallUrl(f.sticker)} alt={f.sticker.name} draggable={false} />
                                 : f.gif!.video
-                                    ? <video src={f.gif!.src} autoPlay loop muted playsInline />
-                                    : <img src={f.gif!.src} alt="GIF" draggable={false} />}
+                                    ? <video src={f.gif!.src} autoPlay loop muted playsInline onError={() => dropGif(f)} />
+                                    : <img src={f.gif!.src} alt="GIF" draggable={false} onError={() => dropGif(f)} />}
                             {f.gif && <span className={cl("gif-badge")}>GIF</span>}
                         </button>
                     ))}

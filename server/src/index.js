@@ -7,6 +7,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Client, Events, GatewayIntentBits, Partials } from "discord.js";
 import { Brain } from "./brain.js";
+import { fingerprint } from "./fingerprint.js";
+import { download, stealFromLobbies } from "./steal.js";
 import { cleanText, mediaExt, Store, TYPE_BY_EXT } from "./store.js";
 
 const { DISCORD_TOKEN, CHANNEL_ID } = process.env;
@@ -44,7 +46,36 @@ setInterval(() => {
     const now = Date.now();
     for (const [ip, e] of useLog) if (now - e.hour > 3_600_000) useLog.delete(ip);
 }, 600_000).unref();
-store.backfillSmall().catch(e => console.error("Nachziehen:", e.message));
+store.backfillSmall()
+    .then(() => store.backfillFingerprints())
+    .catch(e => console.error("Nachziehen:", e.message));
+
+// ── "do we have this one already?" for the plugin (before it adds a GIF) ──
+// Only well-known GIF/Discord hosts, max. 10 MB, results cached, few at a time.
+const MATCH_HOST_RE = /^(cdn\.discordapp\.com|media\.discordapp\.net|images-ext-\d+\.discordapp\.net|media\.tenor\.com|c\.tenor\.com|static\.klipy\.com|media\d*\.giphy\.com|i\.giphy\.com)$/;
+const MATCH_PER_HOUR = 600;
+const matchLog = new Map(); // ip → { hour, count }
+const fpCache = new Map();  // url without query → fingerprint
+let matchBusy = 0;
+async function matchUrl(raw) {
+    const u = new URL(raw);
+    if (u.protocol !== "https:" || !MATCH_HOST_RE.test(u.hostname)) throw new Error("host");
+    const key = u.origin + u.pathname;
+    let fp = fpCache.get(key);
+    if (!fp) {
+        while (matchBusy >= 2) await new Promise(r => setTimeout(r, 200));
+        matchBusy++;
+        try {
+            const { buf, isVideo } = await download(u.href);
+            fp = await fingerprint(buf, isVideo);
+        } finally {
+            matchBusy--;
+        }
+        if (fpCache.size > 3000) fpCache.delete(fpCache.keys().next().value);
+        fpCache.set(key, fp);
+    }
+    return store.findSame(fp)?.id ?? null;
+}
 
 // ── HTTP ────────────────────────────────────────────────────────────────
 const server = http.createServer(async (req, res) => {
@@ -76,6 +107,24 @@ const server = http.createServer(async (req, res) => {
         const ip = String(req.headers["cf-connecting-ip"] ?? (xff || req.socket.remoteAddress) ?? "");
         const ok = allowUse(ip, used[1]) && store.use(used[1]);
         return void res.writeHead(ok ? 204 : 202).end();
+    }
+
+    if (url.pathname === "/api/match") {
+        if (req.method !== "POST") return void res.writeHead(405).end();
+        const xff = String(req.headers["x-forwarded-for"] ?? "").split(",")[0].trim();
+        const ip = String(req.headers["cf-connecting-ip"] ?? (xff || req.socket.remoteAddress) ?? "");
+        const now = Date.now();
+        let e = matchLog.get(ip);
+        if (!e || now - e.hour > 3_600_000) matchLog.set(ip, e = { hour: now, count: 0 });
+        if (++e.count > MATCH_PER_HOUR) return void res.writeHead(429).end();
+        try {
+            const id = await matchUrl(url.searchParams.get("url") ?? "");
+            res.writeHead(200, { "Content-Type": "application/json" });
+            return void res.end(JSON.stringify({ id }));
+        } catch (err) {
+            res.writeHead(422, { "Content-Type": "application/json" });
+            return void res.end(JSON.stringify({ error: String(err?.message ?? err).slice(0, 80) }));
+        }
     }
 
     // <id>.<ext> = Original, <id>.s.<ext> = kleine Sende-Version
@@ -202,6 +251,11 @@ client.once(Events.ClientReady, async c => {
         console.error("Abgleich:", e.message);
     }
     await learnLobbies();
+    // copy popular lobby GIFs into the corner – now and every 3 hours
+    const steal = () => stealFromLobbies({ brain, store, rest: client.rest, channelId: CHANNEL_ID })
+        .catch(e => console.error("Klauen:", e.message));
+    setTimeout(steal, 60_000);
+    setInterval(steal, 3 * 3_600_000).unref();
 });
 
 client.on(Events.MessageCreate, m => {

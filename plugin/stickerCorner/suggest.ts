@@ -119,7 +119,7 @@ export function tokenize(text: string, weight = 1, out: Record<string, number> =
 }
 
 /** Words inside GIF links: tenor.com/view/cat-laugh-gif-123 → cat, laugh */
-function gifWords(url: string): string {
+export function gifWords(url: string): string {
     try {
         const u = new URL(url);
         return decodeURIComponent(u.pathname).replace(/\.(gif|mp4|webm|png|jpe?g)$/i, "").split(/[/_\-.]+/)
@@ -193,6 +193,36 @@ export const safeFileName = (name: string) => name.replace(/[^\p{L}\p{N} _-]/gu,
 const DISCORD_FILE_RE = /^https:\/\/(?:cdn|media)\.discordapp\.(?:com|net)\/attachments\//;
 let byFileName = new Map<string, Sticker>();
 let alias: Record<string, string> = {}; // lobby GIF link → sticker id (from the server)
+/** my own stolen GIFs (autoSteal.ts): link → sticker id */
+let mine: Record<string, string> = {};
+export function setStolenGifs(map: Record<string, string>) {
+    mine = {};
+    for (const [k, id] of Object.entries(map)) if (id !== "x") mine[k] = id;
+}
+const stickerOfGif = (url: string) => alias[url] ?? mine[url] ?? mine[DISCORD_FILE_RE.test(url) ? url.split("?")[0] : url];
+/** a GIF that became a sticker counts as that sticker (also for what was learned before) */
+const mapKey = (k: ItemKey): ItemKey => {
+    if (!k.startsWith("g:")) return k;
+    const id = stickerOfGif(k.slice(2));
+    return id ? `s:${id}` : k;
+};
+
+/** GIFs whose picture failed to load (empty tile) – not suggested again this session */
+const broken = new Set<string>();
+export const markBroken = (url: string) => void broken.add(url);
+/** Can this GIF be shown? Not a web page (tenor.com/view/…), not an expired Discord file link */
+function showable(g: GifItem): boolean {
+    if (broken.has(g.url)) return false;
+    try {
+        const u = new URL(g.src);
+        if (!/\.(gif|mp4|webm|webp|png|jpe?g|mov)$/i.test(u.pathname)) return false;
+        const ex = u.searchParams.get("ex");
+        if (ex && /^[0-9a-f]+$/i.test(ex) && parseInt(ex, 16) * 1000 < Date.now()) return false;
+        return true;
+    } catch {
+        return false;
+    }
+}
 
 /** store.ts calls this whenever the sticker list changes */
 export function setStickerList(list: Sticker[]) {
@@ -204,7 +234,7 @@ function itemOfMessage(m: any): { key: ItemKey; words: string; } | null {
     const content = String(m.content ?? "").trim();
     if (GIF_HOST_RE.test(content) && !/\s/.test(content)) {
         const url = DISCORD_FILE_RE.test(content) ? content.split("?")[0] : content;
-        return { key: alias[url] ? `s:${alias[url]}` : `g:${url}`, words: gifWords(url) };
+        return { key: mapKey(`g:${url}`), words: gifWords(url) };
     }
     for (const a of m.attachments ?? []) {
         const base = String(a.filename ?? "").replace(/\.[^.]+$/, "").toLowerCase();
@@ -212,7 +242,7 @@ function itemOfMessage(m: any): { key: ItemKey; words: string; } | null {
         if (s) return { key: `s:${s.id}`, words: s.name };
         if (/\.gif$/i.test(a.filename ?? "") || /^image\/gif|^video\//.test(a.content_type ?? "")) {
             const url = String(a.url ?? "").split("?")[0];
-            return { key: alias[url] ? `s:${alias[url]}` : `g:${url}`, words: "" };
+            return { key: mapKey(`g:${url}`), words: "" };
         }
     }
     return null;
@@ -368,8 +398,9 @@ function sharedScores(ctx: Record<string, number>, now: number): Map<ItemKey, nu
         const sim = dot / (qn * e.norm);
         if (sim <= 0.08) continue;
         const decay = Math.pow(0.5, (now - e.at) / BRAIN_HALF_LIFE);
-        out.set(e.k, (out.get(e.k) ?? 0) + sim * decay * (e.u === me ? 1.3 : 0.6));
-        hits.set(e.k, (hits.get(e.k) ?? 0) + 1);
+        const k = mapKey(e.k);
+        out.set(k, (out.get(k) ?? 0) + sim * decay * (e.u === me ? 1.3 : 0.6));
+        hits.set(k, (hits.get(k) ?? 0) + 1);
     }
     for (const [k, v] of out) out.set(k, v / Math.pow(hits.get(k)!, POP_DAMP));
     return out;
@@ -431,9 +462,10 @@ export function suggest(channelId: string, stickers: Sticker[], favoriteGifs: Gi
         const sim = cosine(ctxW, tfidf(e.vec));
         if (sim <= 0.05) continue;
         const decay = Math.pow(0.5, (now - e.at) / HALF_LIFE);
-        learned.set(e.key, (learned.get(e.key) ?? 0) + sim * decay);
-        learnedHits.set(e.key, (learnedHits.get(e.key) ?? 0) + 1);
-        if (e.channelId === channelId) inChannel.set(e.key, (inChannel.get(e.key) ?? 0) + 0.15 * decay);
+        const k = mapKey(e.key);
+        learned.set(k, (learned.get(k) ?? 0) + sim * decay);
+        learnedHits.set(k, (learnedHits.get(k) ?? 0) + 1);
+        if (e.channelId === channelId) inChannel.set(k, (inChannel.get(k) ?? 0) + 0.15 * decay);
     }
 
     for (const [k, v] of learned) learned.set(k, v / Math.pow(learnedHits.get(k)!, POP_DAMP));
@@ -442,17 +474,18 @@ export function suggest(channelId: string, stickers: Sticker[], favoriteGifs: Gi
 
     // habit: how often I sent it lately – on this PC, and in the lobbies (the same send is in both, so take the bigger one)
     const mineLocal = new Map<ItemKey, number>();
-    for (const e of examples) mineLocal.set(e.key, (mineLocal.get(e.key) ?? 0) + Math.pow(0.5, (now - e.at) / HABIT_HALF_LIFE));
+    for (const e of examples) mineLocal.set(mapKey(e.key), (mineLocal.get(mapKey(e.key)) ?? 0) + Math.pow(0.5, (now - e.at) / HABIT_HALF_LIFE));
     const mineLobby = new Map<ItemKey, number>();
     const me = hashTok(UserStore.getCurrentUser()?.id ?? "");
-    for (const e of shared) if (e.u === me) mineLobby.set(e.k, (mineLobby.get(e.k) ?? 0) + Math.pow(0.5, (now - e.at) / HABIT_HALF_LIFE));
+    for (const e of shared) if (e.u === me) mineLobby.set(mapKey(e.k), (mineLobby.get(mapKey(e.k)) ?? 0) + Math.pow(0.5, (now - e.at) / HABIT_HALF_LIFE));
     const recentHabit = (key: ItemKey) => HABIT_WEIGHT * Math.log1p(Math.max(mineLocal.get(key) ?? 0, mineLobby.get(key) ?? 0));
 
     // everything that can be suggested, with the words and moods of its name
     const gifs = new Map<string, GifItem>([...Object.values(sharedGifs), ...Object.values(knownGifs), ...favoriteGifs].map(g => [g.url, g]));
     const items: { key: ItemKey; sticker?: Sticker; gif?: GifItem; vec: Record<string, number>; habit: number; }[] = [];
     for (const s of stickers) items.push({ key: `s:${s.id}`, sticker: s, vec: stickerVec(s), habit: 0.04 * Math.log1p(myCount(s.id)) });
-    for (const g of gifs.values()) items.push({ key: `g:${g.url}`, gif: g, vec: gifVec(g.url), habit: 0 });
+    // GIFs that are stickers now show as the sticker; GIFs that cannot be shown would be empty tiles
+    for (const g of gifs.values()) if (!stickerOfGif(g.url) && showable(g)) items.push({ key: `g:${g.url}`, gif: g, vec: gifVec(g.url), habit: 0 });
 
     // name match: chat words no name knows ("raffle", "skates") only count a quarter for the length of the chat,
     // otherwise a long chat pushes every name match towards zero

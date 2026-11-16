@@ -1,6 +1,26 @@
 {
-    "version": "1.15.0",
+    "version": "1.16.0",
     "news": [
+        {
+            "version": "1.16.0",
+            "date": "2026-11-15",
+            "items": {
+                "en": [
+                    "⭐ Your favorite GIFs from Discord's GIF picker move into Sticker Corner by themselves – with a name, and straight into your favorites",
+                    "GIFs and stickers you send through Discord's own pickers are added too",
+                    "Never twice: before anything is added, the server checks whether exactly the same picture is already there – then that one is used",
+                    "Popular lobby GIFs are now taken into Sticker Corner automatically (every 3 hours)",
+                    "Fix: no more empty GIF tiles in Fits right now"
+                ],
+                "de": [
+                    "⭐ Deine Lieblings-GIFs aus Discords GIF-Fenster kommen von selbst in den Sticker Corner – mit Namen und direkt in deine Favoriten",
+                    "GIFs und Sticker, die du über Discords eigene Fenster sendest, kommen auch dazu",
+                    "Nie doppelt: Vor dem Hinzufügen prüft der Server, ob genau dasselbe Bild schon da ist – dann wird das genommen",
+                    "Beliebte Lobby-GIFs kommen jetzt automatisch in den Sticker Corner (alle 3 Stunden)",
+                    "Fix: keine leeren GIF-Kacheln mehr bei Passt gerade"
+                ]
+            }
+        },
         {
             "version": "1.15.0",
             "date": "2026-11-15",

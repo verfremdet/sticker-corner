@@ -49,6 +49,8 @@ const FILE_RE = /^\d+\.(png|jpg|gif|webp)$/;
 const SEND_FILE_RE = /^\d+\.s\.(png|jpg|gif|webp)$/;
 
 let stickers: Sticker[] = [];
+/** attachment posted twice → the sticker it looks like (from the server) */
+let dupes: Record<string, string> = {};
 let version = 0;
 let recent: string[] = [];
 let favorites: string[] = [];
@@ -71,7 +73,7 @@ export async function refresh() {
     try {
         const res = await fetch(`${baseUrl()}/api/stickers`, { cache: "no-cache" });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json() as { version: number; channelId?: string; stickers: Sticker[]; };
+        const data = await res.json() as { version: number; channelId?: string; stickers: Sticker[]; dupes?: Record<string, string>; };
         const changed = data.version !== version || !loaded || failed;
         version = data.version;
         if (typeof data.channelId === "string" && /^\d{5,25}$/.test(data.channelId)) channelId = data.channelId;
@@ -89,6 +91,7 @@ export async function refresh() {
                     sendFile: typeof s.sendFile === "string" && SEND_FILE_RE.test(s.sendFile) ? s.sendFile : undefined,
                 };
             });
+        dupes = data.dupes && typeof data.dupes === "object" ? data.dupes : {};
         setStickerList(stickers);
         loaded = true;
         failed = false;
@@ -122,7 +125,7 @@ export function useStickers() {
         return () => void listeners.delete(l);
     }, []);
     const byId = new Map(stickers.map(s => [s.id, s]));
-    const pick = (ids: string[]) => ids.map(id => byId.get(id)).filter(Boolean) as Sticker[];
+    const pick = (ids: string[]) => [...new Set(ids.map(resolveId))].map(id => byId.get(id)).filter(Boolean) as Sticker[];
     const popular = stickers
         .filter(s => (s.uses ?? 0) > 0)
         .sort((a, b) => (b.uses ?? 0) - (a.uses ?? 0) || b.createdAt - a.createdAt)
@@ -132,7 +135,7 @@ export function useStickers() {
         popular,
         recent: pick(recent),
         favorites: pick(favorites),
-        isFavorite: (id: string) => favorites.includes(id),
+        isFavorite: (id: string) => favorites.some(f => resolveId(f) === id),
         loaded,
         failed,
     };
@@ -160,11 +163,37 @@ function remember(id: string) {
     emit();
 }
 
+/** an id that was posted twice points to the sticker it looks like */
+export const resolveId = (id: string) => dupes[id] ?? id;
+
 /** Favorite on/off – unlimited, newest first */
 export function toggleFavorite(id: string) {
-    favorites = favorites.includes(id) ? favorites.filter(f => f !== id) : [id, ...favorites];
+    favorites = favorites.some(f => resolveId(f) === id) ? favorites.filter(f => resolveId(f) !== id) : [id, ...favorites];
     DataStore.set(FAV_KEY, favorites);
     emit();
+}
+
+/** Make it a favorite (never removes one) */
+export function addFavorite(id: string) {
+    if (favorites.some(f => resolveId(f) === resolveId(id))) return;
+    favorites = [id, ...favorites];
+    DataStore.set(FAV_KEY, favorites);
+    emit();
+}
+
+export const hasSticker = (id: string) => stickers.some(s => s.id === resolveId(id));
+
+/** Ask the server: is a sticker that looks exactly like this picture already there? → id, null = no, undefined = could not check */
+export async function matchOnServer(mediaUrl: string): Promise<string | null | undefined> {
+    try {
+        // no body, no extra headers → no CORS preflight
+        const res = await fetch(`${baseUrl()}/api/match?url=${encodeURIComponent(mediaUrl)}`, { method: "POST" });
+        if (!res.ok) return undefined;
+        const data = await res.json();
+        return typeof data?.id === "string" ? resolveId(data.id) : null;
+    } catch {
+        return undefined;
+    }
 }
 
 /** May I post in the sticker channel? (add + rename are only offered then) */
@@ -405,6 +434,11 @@ function cloudUpload(file: File, channelId: string, toastOnError = true): Promis
 
 /** Posts an uploaded file as a message */
 function postAttachment(channelId: string, up: Uploaded, content: string, messageReference: unknown = null, toastOnError = true): Promise<boolean> {
+    return postAttachmentMessage(channelId, up, content, messageReference, toastOnError).then(m => !!m);
+}
+
+/** Like postAttachment, but gives back the posted message (null on error) */
+function postAttachmentMessage(channelId: string, up: Uploaded, content: string, messageReference: unknown = null, toastOnError = true, silent = false): Promise<any> {
     return RestAPI.post({
         url: Constants.Endpoints.MESSAGES(channelId),
         body: {
@@ -415,10 +449,11 @@ function postAttachment(channelId: string, up: Uploaded, content: string, messag
             type: 0,
             attachments: [{ id: "0", filename: up.filename, uploaded_filename: up.uploadedFilename }],
             message_reference: messageReference,
+            ...(silent ? { flags: 4096, allowed_mentions: { parse: [] } } : {}),
         },
-    }).then(() => true, () => {
+    }).then((res: any) => res?.body ?? {}, () => {
         if (toastOnError) showToast({ text: t("sendFailed"), variant: "critical" });
-        return false;
+        return null;
     });
 }
 
@@ -433,24 +468,40 @@ const EXT_BY_TYPE: Record<string, string> = {
     "video/mp4": "mp4", "video/webm": "webm", "video/quicktime": "mov",
 };
 
-/** "Add to Sticker Corner": posts the image into the sticker channel with the name as text. */
+/**
+ * "Add to Sticker Corner": checks first whether the same picture is already there,
+ * otherwise posts it into the sticker channel with the name as text.
+ */
 export async function addToCorner(src: string, name: string): Promise<boolean> {
-    const res = await Native.fetchMedia(src).catch(() => ({ error: "http" as const }));
-    if (!("data" in res) || !res.data) {
-        showToast({ text: t(res.error === "size" ? "tooBig" : "addFailed"), variant: "critical" });
-        return false;
+    const twin = await matchOnServer(src);
+    if (twin && hasSticker(twin)) {
+        addFavorite(twin);
+        showToast({ text: t("alreadyThere", { name: stickers.find(s => s.id === twin)?.name || "Sticker" }), variant: "default" });
+        return true;
     }
+    const res = await stealToCorner(src, name, { quiet: false });
+    if (res === "big") showToast({ text: t("tooBig"), variant: "critical" });
+    else if (!res) showToast({ text: t("addFailed"), variant: "critical" });
+    else showToast({ text: t("added"), variant: "success" });
+    return !!res && res !== "big";
+}
+
+/**
+ * Posts a picture into the sticker channel (no duplicate check – do that first).
+ * @returns the new sticker id, "big" when it is over 10 MB, null on any other error
+ */
+export async function stealToCorner(src: string, name: string, { quiet = true } = {}): Promise<string | null> {
+    const res = await Native.fetchMedia(src).catch(() => ({ error: "http" as const }));
+    if (!("data" in res) || !res.data) return res.error === "size" ? "big" : null;
     const pathExt = /\.(png|jpe?g|gif|webp|mp4|webm|mov)(?:$|\?)/i.exec(new URL(src).pathname)?.[1]?.toLowerCase();
     const ext = EXT_BY_TYPE[res.type ?? ""] ?? (pathExt === "jpeg" ? "jpg" : pathExt);
-    if (!ext) {
-        showToast({ text: t("addFailed"), variant: "critical" });
-        return false;
-    }
-    const file = new File([new Uint8Array(res.data)],`${safeFileName(name)}.${ext}`, { type: res.type || `image/${ext}` });
-    const ok = await uploadFile(file, channelId, name.trim().slice(0, 60));
-    if (ok) {
-        showToast({ text: t("added"), variant: "success" });
-        setTimeout(refresh, 5000);
-    }
-    return ok;
+    if (!ext) return null;
+    const file = new File([new Uint8Array(res.data)], `${safeFileName(name)}.${ext}`, { type: res.type || `image/${ext}` });
+    const up = await cloudUpload(file, channelId, !quiet);
+    if (!up) return null;
+    const msg = await postAttachmentMessage(channelId, up, name.trim().slice(0, 60), null, !quiet, quiet);
+    if (!msg) return null;
+    setTimeout(refresh, 5000);
+    const id = msg.attachments?.[0]?.id;
+    return typeof id === "string" ? id : null;
 }

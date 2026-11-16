@@ -15,6 +15,11 @@ const MAX_EXAMPLES = 4000;
 /** Discord file links carry expiring parameters – the key is the link without them */
 const baseUrl = url => DISCORD_FILE_RE.test(url) ? url.split("?")[0] : url;
 
+/** link to a picture/video file (not a web page like tenor.com/view/…) */
+const isMediaLink = src => {
+    try { return /\.(gif|mp4|webm|webp|png|jpe?g|mov)$/i.test(new URL(src).pathname); } catch { return false; }
+};
+
 const textOf = m => `${m.content ?? ""} ${[...(m.embeds ?? [])].map(e => gifWords(e.url ?? "")).join(" ")}`;
 
 export class Brain {
@@ -203,6 +208,16 @@ export class Brain {
         this.saveTimer = setTimeout(() => this.save().catch(e => console.error("brain.json:", e.message)), 5000);
     }
 
+    /** steal.js: this lobby GIF is (or looks exactly like) that sticker now */
+    async markStolen(key, id) {
+        this.stolen[key] = id;
+        this.stolenRaw = JSON.stringify(this.stolen, null, 1);
+        const tmp = this.stolenPath + ".tmp";
+        await writeFile(tmp, this.stolenRaw);
+        await rename(tmp, this.stolenPath);
+        this.changed();
+    }
+
     /** stolen GIF → it is a Sticker Corner sticker now */
     keyOf(k) {
         const id = this.stolen[k];
@@ -215,6 +230,7 @@ export class Brain {
         for (const [k, it] of this.items) {
             if (this.keyOf(k) !== k) continue;              // is a sticker now
             if (DISCORD_FILE_RE.test(it.url)) continue;     // file links expire – only usable once stolen
+            if (!isMediaLink(it.src)) continue;             // a web page, not a picture → would be an empty tile
             gifs[it.url] = { src: it.src, video: it.video, width: it.width, height: it.height };
         }
         // lobby GIF link → the sticker it became (so the plugin can recognize it in the chat)

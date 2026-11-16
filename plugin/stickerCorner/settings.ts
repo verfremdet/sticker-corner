@@ -24,6 +24,11 @@ export const settings = definePluginSettings({
         description: "✨ Fits right now above the message box / Passt gerade über dem Eingabefeld",
         default: true,
     },
+    autoSteal: {
+        type: OptionType.BOOLEAN,
+        description: "Take your Discord favorite GIFs (and GIFs/stickers you send) into Sticker Corner by itself, never twice / Discord-Lieblings-GIFs (und gesendete GIFs/Sticker) von selbst in Sticker Corner übernehmen, nie doppelt",
+        default: true,
+    },
     sounds: {
         type: OptionType.BOOLEAN,
         description: "Sounds (slot machine, ticket helper) / Klänge",
